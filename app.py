@@ -83,11 +83,6 @@ else:
             week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
             month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
 
-            hist_3mo = stock.history(period="3mo")
-            hist_6mo = stock.history(period="6mo")
-            three_month_change = ((hist_3mo["Close"][-1] - hist_3mo["Close"][0]) / hist_3mo["Close"][0]) * 100
-            six_month_change = ((hist_6mo["Close"][-1] - hist_6mo["Close"][0]) / hist_6mo["Close"][0]) * 100
-
             high_52 = hist_1y["High"].max()
             low_52 = hist_1y["Low"].min()
 
@@ -99,9 +94,7 @@ else:
                 "Current Price": round(current_price, 2),
                 "Day Change (%)": round(day_change, 2),
                 "1-Week Change (%)": round(week_change, 2),
-                "1-Month Change (%)", "3-Month Change (%)", "6-Month Change (%)": round(month_change, 2),
-                "3-Month Change (%)": round(three_month_change, 2),
-                "6-Month Change (%)": round(six_month_change, 2),
+                "1-Month Change (%)": round(month_change, 2),
                 "52-Week High": round(high_52, 2),
                 "52-Week Low": round(low_52, 2)
             })
@@ -118,7 +111,7 @@ else:
         return ''
 
     st.dataframe(df.style.applymap(color_negative_red, subset=[
-        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)", "3-Month Change (%)", "6-Month Change (%)"
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
     ]), use_container_width=True)
 
     csv = df.to_csv(index=False)
