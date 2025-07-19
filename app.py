@@ -1,41 +1,24 @@
 import streamlit as st
 import yfinance as yf
-from datetime import datetime, timedelta
-from supabase_helper import sign_in, sign_up, add_to_watchlist, get_watchlist, remove_from_watchlist
+from datetime import datetime
+from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchlist
 
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
 
 st.title("📈 NSE Stock Watchlist")
 
-# --- Auth Section ---
+# --- Simple Login ---
 if "user" not in st.session_state:
-    tab1, tab2 = st.tabs(["🔐 Login", "🆕 Sign Up"])
-
-    with tab1:
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        if st.button("Login"):
-            res = sign_in(email, password)
-            if res.user:
-                st.session_state.user = res.user
-                st.rerun()
-            else:
-                st.error("Login failed")
-
-    with tab2:
-        email = st.text_input("Email", key="signup_email")
-        password = st.text_input("Password", type="password", key="signup_pw")
-        if st.button("Sign Up"):
-            res = sign_up(email, password)
-            if res.user:
-                st.success("Account created. Please log in.")
-                st.experimental_rerun()
-            else:
-                st.error("Signup failed")
-
+    username = st.text_input("Enter your name to continue:")
+    if st.button("Login"):
+        if username:
+            st.session_state.user = username
+            st.experimental_rerun()
+        else:
+            st.warning("Please enter a name to login.")
 else:
     user = st.session_state.user
-    st.success(f"Logged in as: {user.email}")
+    st.success(f"Logged in as: {user}")
     st.button("Logout", on_click=lambda: st.session_state.clear())
 
     # --- Watchlist Management ---
@@ -52,14 +35,14 @@ else:
     name_to_symbol = {v: k for k, v in stock_dict.items()}
     all_names = list(name_to_symbol.keys())
 
-    watchlist = get_watchlist(user.id)
+    watchlist = get_watchlist(user)
 
     st.subheader("📌 Add to Watchlist")
     add_name = st.selectbox("Select stock to add", all_names)
     if st.button("➕ Add"):
         symbol = name_to_symbol[add_name]
         if symbol not in watchlist:
-            add_to_watchlist(user.id, symbol)
+            add_to_watchlist(user, symbol)
             st.success(f"{add_name} added!")
             st.rerun()
 
@@ -83,10 +66,10 @@ else:
                 col1.markdown(f"**{symbol}**")
                 col2.markdown(f"💰 ₹{round(current_price,2)}")
                 col3.markdown(f"<span style='color: {'green' if change > 0 else 'red'};'>{round(change,2)}%</span>", unsafe_allow_html=True)
-                col4.markdown(f"📈 High: ₹{round(high_52,2)}📉 Low: ₹{round(low_52,2)}")
+                col4.markdown(f"📈 High: ₹{round(high_52, 2)}\n📉 Low: ₹{round(low_52, 2)}")
 
                 if col5.button("❌ Remove", key=symbol):
-                    remove_from_watchlist(user.id, symbol)
+                    remove_from_watchlist(user, symbol)
                     st.rerun()
 
             except Exception as e:
