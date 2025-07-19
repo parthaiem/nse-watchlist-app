@@ -35,95 +35,90 @@ with top_col3:
         st.stop()
 
 # --- Stock Dictionary ---
-stock_dict = {
-    "TCS.NS": "TATA CONSULTANCY SERVICES",
-    "INFY.NS": "INFOSYS",
-    "WIPRO.NS": "WIPRO",
-    "HCLTECH.NS": "HCL TECHNOLOGIES",
-    "RELIANCE.NS": "RELIANCE INDUSTRIES",
-    "SBIN.NS": "STATE BANK OF INDIA",
-    "ICICIBANK.NS": "ICICI BANK",
-    "TECHM.NS": "TECH MAHINDRA"
-}
+ # --- Watchlist Management ---
+    stock_dict = {
+        "TCS.NS": "TATA CONSULTANCY SERVICES",
+        "INFY.NS": "INFOSYS",
+        "WIPRO.NS": "WIPRO",
+        "HCLTECH.NS": "HCL TECHNOLOGIES",
+        "RELIANCE.NS": "RELIANCE INDUSTRIES",
+        "SBIN.NS": "STATE BANK OF INDIA",
+        "ICICIBANK.NS": "ICICI BANK",
+        "TECHM.NS": "TECH MAHINDRA"
+    }
 
-name_to_symbol = {v: k for k, v in stock_dict.items()}
-all_names = list(name_to_symbol.keys())
-user = st.session_state.user
-watchlist = get_watchlist(user)
+    name_to_symbol = {v: k for k, v in stock_dict.items()}
+    all_names = list(name_to_symbol.keys())
 
-st.subheader("📌 Add to Watchlist")
-add_name = st.selectbox("Select stock to add", all_names)
-if st.button("➕ Add"):
-    symbol = name_to_symbol[add_name]
-    if symbol not in watchlist:
-        add_to_watchlist(user, symbol)
-        st.success(f"{add_name} added!")
-        st.rerun()
+    watchlist = get_watchlist(user)
 
-st.subheader("📉 Your Watchlist")
+    st.subheader("📌 Add to Watchlist")
+    add_name = st.selectbox("Select stock to add", all_names)
+    if st.button("➕ Add"):
+        symbol = name_to_symbol[add_name]
+        if symbol not in watchlist:
+            add_to_watchlist(user, symbol)
+            st.success(f"{add_name} added!")
+            st.rerun()
 
-if not watchlist:
-    st.info("Your watchlist is empty.")
-else:
-    data_rows = []
-    for symbol in watchlist:
-        try:
-            stock = yf.Ticker(symbol)
-            hist_1mo = stock.history(period="1mo")
-            hist_1wk = stock.history(period="7d")
-            hist_1y = stock.history(period="1y")
+    st.subheader("📉 Your Watchlist")
 
-            current_price = hist_1mo["Close"][-1]
-            previous_close = hist_1mo["Close"][-2]
-            day_change = ((current_price - previous_close) / previous_close) * 100
+    if not watchlist:
+        st.info("Your watchlist is empty.")
+    else:
+        data_rows = []
 
-            week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
-            month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
+        for symbol in watchlist:
+            try:
+                stock = yf.Ticker(symbol)
 
-            high_52 = hist_1y["High"].max()
-            low_52 = hist_1y["Low"].min()
-            company = stock_dict.get(symbol, "Unknown")
+                # Historical prices
+                hist_1mo = stock.history(period="1mo")
+                hist_1wk = stock.history(period="7d")
+                hist_1y = stock.history(period="1y")
 
-            with st.expander(f"{symbol} — {company}"):
-                cols = st.columns(3)
-                color_day = "green" if day_change >= 0 else "red"
-                color_week = "green" if week_change >= 0 else "red"
-                color_month = "green" if month_change >= 0 else "red"
+                current_price = hist_1mo["Close"][-1]
+                previous_close = hist_1mo["Close"][-2]
+                day_change = ((current_price - previous_close) / previous_close) * 100
 
-                cols[0].markdown(f"💰 **Current Price:** ₹{round(current_price, 2)}")
-                cols[0].markdown(f"<span style='color:{color_day}'>🔺 Day Change: {round(day_change,2)}%</span>", unsafe_allow_html=True)
-                cols[1].markdown(f"<span style='color:{color_week}'>📅 1-Week Change: {round(week_change,2)}%</span>", unsafe_allow_html=True)
-                cols[1].markdown(f"<span style='color:{color_month}'>🗓️ 1-Month Change: {round(month_change,2)}%</span>", unsafe_allow_html=True)
-                cols[2].markdown(f"📈 52-Week High: ₹{round(high_52,2)}")
-                cols[2].markdown(f"📉 52-Week Low: ₹{round(low_52,2)}")
+                week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
+                month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
 
-                # Line chart
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=hist_1mo.index, y=hist_1mo["Close"], mode="lines", name="Close Price"))
-                fig.update_layout(title="1-Month Price Trend", xaxis_title="Date", yaxis_title="Price", height=300)
-                st.plotly_chart(fig, use_container_width=True)
+                high_52 = hist_1y["High"].max()
+                low_52 = hist_1y["Low"].min()
 
-                if st.button(f"❌ Remove {symbol}", key=f"remove_{symbol}"):
-                    remove_from_watchlist(user, symbol)
-                    st.rerun()
+                company = stock_dict.get(symbol, "Unknown")
 
-            # For export
-            data_rows.append({
-                "Symbol": symbol,
-                "Company": company,
-                "Current Price": round(current_price, 2),
-                "Day Change (%)": round(day_change, 2),
-                "1-Week Change (%)": round(week_change, 2),
-                "1-Month Change (%)": round(month_change, 2),
-                "52-Week High": round(high_52, 2),
-                "52-Week Low": round(low_52, 2)
-            })
-        except Exception as e:
-            st.error(f"Error fetching data for {symbol}: {e}")
+                data_rows.append({
+                    "Symbol": symbol,
+                    "Company": company,
+                    "Current Price": round(current_price, 2),
+                    "Day Change (%)": round(day_change, 2),
+                    "1-Week Change (%)": round(week_change, 2),
+                    "1-Month Change (%)": round(month_change, 2),
+                    "52-Week High": round(high_52, 2),
+                    "52-Week Low": round(low_52, 2)
+                })
 
-    df = pd.DataFrame(data_rows)
-    csv = df.to_csv(index=False)
-    st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
+            except Exception as e:
+                st.error(f"Error fetching {symbol}: {e}")
+
+        df = pd.DataFrame(data_rows)
+
+        # Display table with color formatting
+        def color_negative_red(val):
+            if isinstance(val, (float, int)):
+                color = 'red' if val < 0 else 'green'
+                return f'color: {color}'
+            return ''
+
+        st.dataframe(df.style.applymap(color_negative_red, subset=[
+            "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+        ]), use_container_width=True)
+
+        # Download button
+        csv = df.to_csv(index=False)
+        st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
 # --- Footer ---
 st.markdown("---")
