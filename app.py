@@ -10,19 +10,7 @@ st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
 
 # Show company logo at the top
-# st.image("logo.jpg", width=180)
-st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
-
-# Logo at top-left
-st.markdown(
-    """
-    <div style='display: flex; align-items: center; justify-content: flex-start;'>
-        <img src='logo.jpg' width='140' style='margin-right: 10px;' />
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
+st.image("logo.jpg", width=180)
 st.title("📈 NSE Stock Watchlist")
 
 # --- Simple Login ---
