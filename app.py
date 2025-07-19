@@ -7,6 +7,11 @@ from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
 st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
+st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
+
+# Show company logo at the top
+st.image("logo.jpg", width=180)
+
 
 st.title("📈 NSE Stock Watchlist")
 
