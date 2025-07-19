@@ -83,9 +83,7 @@ else:
                 col1.markdown(f"**{symbol}**")
                 col2.markdown(f"💰 ₹{round(current_price,2)}")
                 col3.markdown(f"<span style='color: {'green' if change > 0 else 'red'};'>{round(change,2)}%</span>", unsafe_allow_html=True)
-                col4.markdown(f"📈 High: ₹{round(high_52,2)}
-
-📉 Low: ₹{round(low_52,2)}")
+                col4.markdown(f"📈 High: ₹{round(high_52,2)}📉 Low: ₹{round(low_52,2)}")
 
                 if col5.button("❌ Remove", key=symbol):
                     remove_from_watchlist(user.id, symbol)
