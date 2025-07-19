@@ -13,7 +13,7 @@ if "user" not in st.session_state:
     if st.button("Login"):
         if username:
             st.session_state.user = username
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.warning("Please enter a name to login.")
 else:
