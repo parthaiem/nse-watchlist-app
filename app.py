@@ -119,7 +119,7 @@ else:
 
     # --- Footer ---
     st.markdown("---")
-    st.image("https://upload.wikimedia.org/wikipedia/commons/1/1b/Angel_One_Logo.svg", width=100)
+    st.image("logo.jpg", width=100)
     st.markdown(f"""
         <div style='text-align: center; font-size: 16px; padding-top: 20px;'>
             <strong>📊 FinSmart Wealth Advisory</strong><br>
