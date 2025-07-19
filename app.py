@@ -35,90 +35,87 @@ with top_col3:
         st.stop()
 
 # --- Stock Dictionary ---
- # --- Watchlist Management ---
-    stock_dict = {
-        "TCS.NS": "TATA CONSULTANCY SERVICES",
-        "INFY.NS": "INFOSYS",
-        "WIPRO.NS": "WIPRO",
-        "HCLTECH.NS": "HCL TECHNOLOGIES",
-        "RELIANCE.NS": "RELIANCE INDUSTRIES",
-        "SBIN.NS": "STATE BANK OF INDIA",
-        "ICICIBANK.NS": "ICICI BANK",
-        "TECHM.NS": "TECH MAHINDRA"
-    }
+stock_dict = {
+    "TCS.NS": "TATA CONSULTANCY SERVICES",
+    "INFY.NS": "INFOSYS",
+    "WIPRO.NS": "WIPRO",
+    "HCLTECH.NS": "HCL TECHNOLOGIES",
+    "RELIANCE.NS": "RELIANCE INDUSTRIES",
+    "SBIN.NS": "STATE BANK OF INDIA",
+    "ICICIBANK.NS": "ICICI BANK",
+    "TECHM.NS": "TECH MAHINDRA"
+}
 
-    name_to_symbol = {v: k for k, v in stock_dict.items()}
-    all_names = list(name_to_symbol.keys())
+name_to_symbol = {v: k for k, v in stock_dict.items()}
+all_names = list(name_to_symbol.keys())
 
-    watchlist = get_watchlist(user)
+user = st.session_state.user
+watchlist = get_watchlist(user)
 
-    st.subheader("📌 Add to Watchlist")
-    add_name = st.selectbox("Select stock to add", all_names)
-    if st.button("➕ Add"):
-        symbol = name_to_symbol[add_name]
-        if symbol not in watchlist:
-            add_to_watchlist(user, symbol)
-            st.success(f"{add_name} added!")
-            st.rerun()
+st.subheader("📌 Add to Watchlist")
+add_name = st.selectbox("Select stock to add", all_names)
+if st.button("➕ Add"):
+    symbol = name_to_symbol[add_name]
+    if symbol not in watchlist:
+        add_to_watchlist(user, symbol)
+        st.success(f"{add_name} added!")
+        st.rerun()
 
-    st.subheader("📉 Your Watchlist")
+st.subheader("📉 Your Watchlist")
 
-    if not watchlist:
-        st.info("Your watchlist is empty.")
-    else:
-        data_rows = []
+if not watchlist:
+    st.info("Your watchlist is empty.")
+else:
+    data_rows = []
 
-        for symbol in watchlist:
-            try:
-                stock = yf.Ticker(symbol)
+    for symbol in watchlist:
+        try:
+            stock = yf.Ticker(symbol)
 
-                # Historical prices
-                hist_1mo = stock.history(period="1mo")
-                hist_1wk = stock.history(period="7d")
-                hist_1y = stock.history(period="1y")
+            hist_1mo = stock.history(period="1mo")
+            hist_1wk = stock.history(period="7d")
+            hist_1y = stock.history(period="1y")
 
-                current_price = hist_1mo["Close"][-1]
-                previous_close = hist_1mo["Close"][-2]
-                day_change = ((current_price - previous_close) / previous_close) * 100
+            current_price = hist_1mo["Close"][-1]
+            previous_close = hist_1mo["Close"][-2]
+            day_change = ((current_price - previous_close) / previous_close) * 100
 
-                week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
-                month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
+            week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
+            month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
 
-                high_52 = hist_1y["High"].max()
-                low_52 = hist_1y["Low"].min()
+            high_52 = hist_1y["High"].max()
+            low_52 = hist_1y["Low"].min()
 
-                company = stock_dict.get(symbol, "Unknown")
+            company = stock_dict.get(symbol, "Unknown")
 
-                data_rows.append({
-                    "Symbol": symbol,
-                    "Company": company,
-                    "Current Price": round(current_price, 2),
-                    "Day Change (%)": round(day_change, 2),
-                    "1-Week Change (%)": round(week_change, 2),
-                    "1-Month Change (%)": round(month_change, 2),
-                    "52-Week High": round(high_52, 2),
-                    "52-Week Low": round(low_52, 2)
-                })
+            data_rows.append({
+                "Symbol": symbol,
+                "Company": company,
+                "Current Price": round(current_price, 2),
+                "Day Change (%)": round(day_change, 2),
+                "1-Week Change (%)": round(week_change, 2),
+                "1-Month Change (%)": round(month_change, 2),
+                "52-Week High": round(high_52, 2),
+                "52-Week Low": round(low_52, 2)
+            })
 
-            except Exception as e:
-                st.error(f"Error fetching {symbol}: {e}")
+        except Exception as e:
+            st.error(f"Error fetching {symbol}: {e}")
 
-        df = pd.DataFrame(data_rows)
+    df = pd.DataFrame(data_rows)
 
-        # Display table with color formatting
-        def color_negative_red(val):
-            if isinstance(val, (float, int)):
-                color = 'red' if val < 0 else 'green'
-                return f'color: {color}'
-            return ''
+    def color_negative_red(val):
+        if isinstance(val, (float, int)):
+            color = 'red' if val < 0 else 'green'
+            return f'color: {color}'
+        return ''
 
-        st.dataframe(df.style.applymap(color_negative_red, subset=[
-            "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-        ]), use_container_width=True)
+    st.dataframe(df.style.applymap(color_negative_red, subset=[
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+    ]), use_container_width=True)
 
-        # Download button
-        csv = df.to_csv(index=False)
-        st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
+    csv = df.to_csv(index=False)
+    st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
 # --- Footer ---
 st.markdown("---")
