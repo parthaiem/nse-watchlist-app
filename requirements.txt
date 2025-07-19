@@ -1,3 +1,4 @@
 streamlit
 yfinance
 supabase
+streamlit-autorefresh
