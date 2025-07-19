@@ -10,8 +10,13 @@ st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
 
 # Show company logo at the top
-st.image("logo.jpg", width=180)
-st.title("📈 NSE Stock Watchlist")
+# Top-left logo with layout
+col1, col2 = st.columns([1, 5])
+with col1:
+    st.image("logo.jpg", width=140)
+with col2:
+    st.markdown("<h1 style='margin-top: 20px;'>📈 NSE Stock Watchlist</h1>", unsafe_allow_html=True)
+
 
 # --- Simple Login ---
 if "user" not in st.session_state:
