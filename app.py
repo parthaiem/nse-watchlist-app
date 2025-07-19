@@ -2,8 +2,11 @@ import streamlit as st
 import yfinance as yf
 from datetime import datetime
 from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchlist
+import pandas as pd
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
+st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
 
 st.title("📈 NSE Stock Watchlist")
 
@@ -23,13 +26,14 @@ else:
 
     # --- Watchlist Management ---
     stock_dict = {
-        "TCS.NS": "Tata Consultancy Services",
-        "INFY.NS": "Infosys",
-        "WIPRO.NS": "Wipro",
-        "HCLTECH.NS": "HCL Technologies",
-        "RELIANCE.NS": "Reliance Industries",
-        "SBIN.NS": "State Bank of India",
-        "ICICIBANK.NS": "ICICI Bank"
+        "TCS.NS": "TATA CONSULTANCY SERVICES",
+        "INFY.NS": "INFOSYS",
+        "WIPRO.NS": "WIPRO",
+        "HCLTECH.NS": "HCL TECHNOLOGIES",
+        "RELIANCE.NS": "RELIANCE INDUSTRIES",
+        "SBIN.NS": "STATE BANK OF INDIA",
+        "ICICIBANK.NS": "ICICI BANK",
+        "TECHM.NS": "TECH MAHINDRA"
     }
 
     name_to_symbol = {v: k for k, v in stock_dict.items()}
@@ -47,33 +51,63 @@ else:
             st.rerun()
 
     st.subheader("📉 Your Watchlist")
+
     if not watchlist:
         st.info("Your watchlist is empty.")
     else:
-        today = datetime.today()
+        data_rows = []
+
         for symbol in watchlist:
             try:
                 stock = yf.Ticker(symbol)
-                hist = stock.history(period="1mo")
 
-                current_price = hist["Close"][-1]
-                previous_close = hist["Close"][-2]
-                change = ((current_price - previous_close) / previous_close) * 100
-                high_52 = stock.history(period="1y")["High"].max()
-                low_52 = stock.history(period="1y")["Low"].min()
+                # Historical prices
+                hist_1mo = stock.history(period="1mo")
+                hist_1wk = stock.history(period="7d")
+                hist_1y = stock.history(period="1y")
 
-                col1, col2, col3, col4, col5 = st.columns(5)
-                col1.markdown(f"**{symbol}**")
-                col2.markdown(f"💰 ₹{round(current_price,2)}")
-                col3.markdown(f"<span style='color: {'green' if change > 0 else 'red'};'>{round(change,2)}%</span>", unsafe_allow_html=True)
-                col4.markdown(f"📈 High: ₹{round(high_52, 2)}\n📉 Low: ₹{round(low_52, 2)}")
+                current_price = hist_1mo["Close"][-1]
+                previous_close = hist_1mo["Close"][-2]
+                day_change = ((current_price - previous_close) / previous_close) * 100
 
-                if col5.button("❌ Remove", key=symbol):
-                    remove_from_watchlist(user, symbol)
-                    st.rerun()
+                week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
+                month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
+
+                high_52 = hist_1y["High"].max()
+                low_52 = hist_1y["Low"].min()
+
+                company = stock_dict.get(symbol, "Unknown")
+
+                data_rows.append({
+                    "Symbol": symbol,
+                    "Company": company,
+                    "Current Price": round(current_price, 2),
+                    "Day Change (%)": round(day_change, 2),
+                    "1-Week Change (%)": round(week_change, 2),
+                    "1-Month Change (%)": round(month_change, 2),
+                    "52-Week High": round(high_52, 2),
+                    "52-Week Low": round(low_52, 2)
+                })
 
             except Exception as e:
                 st.error(f"Error fetching {symbol}: {e}")
+
+        df = pd.DataFrame(data_rows)
+
+        # Display table with color formatting
+        def color_negative_red(val):
+            if isinstance(val, (float, int)):
+                color = 'red' if val < 0 else 'green'
+                return f'color: {color}'
+            return ''
+
+        st.dataframe(df.style.applymap(color_negative_red, subset=[
+            "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+        ]), use_container_width=True)
+
+        # Download button
+        csv = df.to_csv(index=False)
+        st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
     # --- Footer ---
     st.markdown("---")
