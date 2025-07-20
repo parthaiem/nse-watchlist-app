@@ -103,7 +103,7 @@ else:
                 "Day Change (%)": f"{day_change:+.2f}%",
                 "1-Week Change (%)": f"{week_change:+.2f}%",
                 "1-Month Change (%)": f"{month_change:+.2f}%",
-                "52-Week High": f"{high_52:+.2f}",
+                "52-Week High": f"{high_52:.2f}",
                 "52-Week Low": round(low_52, 2)
             })
 
