@@ -5,6 +5,13 @@ from datetime import datetime
 from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchlist
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objs as go
+def color_percent(val):
+    try:
+        val_float = float(val.strip('%+'))
+        color = 'green' if val_float >= 0 else 'red'
+        return f'color: {color}'
+    except:
+        return ''
 
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
 st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
@@ -110,8 +117,9 @@ else:
             return f'color: {color}'
         return ''
 
-    st.dataframe(df.style.applymap(color_negative_red, subset=[
-        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+    st.dataframe(df.style.applymap(color_percent, subset=[
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)",
+        "3-Month Change (%)", "6-Month Change (%)"
     ]), use_container_width=True)
 
     csv = df.to_csv(index=False)
