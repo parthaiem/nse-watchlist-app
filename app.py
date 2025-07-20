@@ -118,9 +118,7 @@ else:
         return ''
 
     st.dataframe(df.style.applymap(color_percent, subset=[
-        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)",
-        "3-Month Change (%)", "6-Month Change (%)"
-    ]), use_container_width=True)
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"]), use_container_width=True)
 
     csv = df.to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
