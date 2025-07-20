@@ -91,12 +91,12 @@ else:
             data_rows.append({
                 "Symbol": symbol,
                 "Company": company,
-                "Current Price": round(current_price, 2),
-                "Day Change (%)": round(day_change, 2),
-                "1-Week Change (%)": round(week_change, 2),
-                "1-Month Change (%)": round(month_change, 2),
-                "52-Week High": round(high_52, 2),
-                "52-Week Low": round(low_52, 2)
+                "Current Price": round(current_price:.2f),
+                "Day Change (%)": round(day_change:.2f),
+                "1-Week Change (%)": round(week_change:.2f),
+                "1-Month Change (%)": round(month_change:.2f),
+                "52-Week High": round(high_52:.2f),
+                "52-Week Low": round(low_52:.2f)
             })
 
         except Exception as e:
