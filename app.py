@@ -86,6 +86,7 @@ else:
             current_price = hist_1mo["Close"][-1]
             previous_close = hist_1mo["Close"][-2]
             day_change = ((current_price - previous_close) / previous_close) * 100
+            
 
             week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
             month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
@@ -102,7 +103,7 @@ else:
                 "Day Change (%)": f"{day_change:+.2f}%",
                 "1-Week Change (%)": f"{week_change:+.2f}%",
                 "1-Month Change (%)": f"{month_change:+.2f}%",
-                "52-Week High": round(high_52, 2),
+                "52-Week High": f"{high_52:+.2f}",
                 "52-Week Low": round(low_52, 2)
             })
 
