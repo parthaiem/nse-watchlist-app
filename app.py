@@ -142,33 +142,11 @@ else:
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    # Render custom HTML table with links
+    # Create HTML table with View links
     table_html = """
-    <style>
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    th, td {
-        padding: 8px 12px;
-        text-align: center;
-        border: 1px solid #ddd;
-        font-size: 15px;
-    }
-    th {
-        background-color: #f2f2f2;
-    }
-    tr:hover {
-        background-color: #f9f9f9;
-    }
-    a {
-        text-decoration: none;
-        color: #0072C6;
-    }
-    </style>
-    <table>
+    <table style='width:100%; border-collapse: collapse;' border='1'>
         <thead>
-            <tr>
+            <tr style='background-color:#f0f2f6;'>
                 <th>Symbol</th>
                 <th>Company</th>
                 <th>Current Price</th>
@@ -182,20 +160,25 @@ else:
         </thead>
         <tbody>
     """
+
     for row in data_rows:
+        def color(val):
+            return f"<span style='color:{'green' if '-' not in val else 'red'}'>{val}</span>"
+
         table_html += f"""
         <tr>
             <td>{row['Symbol']}</td>
             <td>{row['Company']}</td>
             <td>{row['Current Price']}</td>
-            <td style='color: {'green' if '+' in row['Day Change (%)'] else 'red'}'>{row['Day Change (%)']}</td>
-            <td style='color: {'green' if '+' in row['1-Week Change (%)'] else 'red'}'>{row['1-Week Change (%)']}</td>
-            <td style='color: {'green' if '+' in row['1-Month Change (%)'] else 'red'}'>{row['1-Month Change (%)']}</td>
+            <td>{color(row['Day Change (%)'])}</td>
+            <td>{color(row['1-Week Change (%)'])}</td>
+            <td>{color(row['1-Month Change (%)'])}</td>
             <td>{row['52-Week High']}</td>
             <td>{row['52-Week Low']}</td>
-            <td><a href='?stock={row['Symbol']}'>View</a></td>
+            <td><a href='?stock={row["Symbol"]}' style='text-decoration:none;'>🔍 View</a></td>
         </tr>
         """
+
     table_html += "</tbody></table>"
     st.markdown(table_html, unsafe_allow_html=True)
 
