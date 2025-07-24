@@ -129,8 +129,6 @@ else:
 
             company = stock_dict.get(symbol, "Unknown")
 
-            link = f"[Details](?stock={symbol})"
-
             data_rows.append({
                 "Symbol": symbol,
                 "Company": company,
@@ -139,18 +137,74 @@ else:
                 "1-Week Change (%)": f"{week_change:+.2f}%",
                 "1-Month Change (%)": f"{month_change:+.2f}%",
                 "52-Week High": f"{high_52:.2f}",
-                "52-Week Low": f"{low_52:.2f}",
-                "Details": link
+                "52-Week Low": f"{low_52:.2f}"
             })
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    df = pd.DataFrame(data_rows)
-    st.dataframe(df.style.applymap(color_percent, subset=[
-        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-    ]), use_container_width=True)
+    # Render HTML table with clickable view buttons
+    table_html = """
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        td a {
+            text-decoration: none;
+            background-color: #007bff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Company</th>
+                <th>Current Price</th>
+                <th>Day Change (%)</th>
+                <th>1-Week Change (%)</th>
+                <th>1-Month Change (%)</th>
+                <th>52-Week High</th>
+                <th>52-Week Low</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
 
-    csv = df.to_csv(index=False)
+    for row in data_rows:
+        def color(val):
+            return f"<span style='color: {'green' if '-' not in val else 'red'}'>{val}</span>"
+
+        table_html += f"""
+        <tr>
+            <td>{row['Symbol']}</td>
+            <td>{row['Company']}</td>
+            <td>{row['Current Price']}</td>
+            <td>{color(row['Day Change (%)'])}</td>
+            <td>{color(row['1-Week Change (%)'])}</td>
+            <td>{color(row['1-Month Change (%)'])}</td>
+            <td>{row['52-Week High']}</td>
+            <td>{row['52-Week Low']}</td>
+            <td><a href='stock_detail_page?stock={row['Symbol']}'>View</a></td>
+        </tr>
+        """
+
+    table_html += "</tbody></table>"
+    st.markdown(table_html, unsafe_allow_html=True)
+
+    csv = pd.DataFrame(data_rows).to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
 # --- Footer ---
