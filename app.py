@@ -145,10 +145,20 @@ else:
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    df = pd.DataFrame(data_rows)
-    st.dataframe(df.style.applymap(color_percent, subset=[
-        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-    ]), use_container_width=True)
+    #df = pd.DataFrame(data_rows)
+    #st.dataframe(df.style.applymap(color_percent, subset=[
+     #   "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+    ])#, use_container_width=True)
+    # Convert dataframe to HTML to enable links
+    def make_clickable(symbol):
+        return f'<a href="/?stock={symbol}" target="_self">Details</a>'
+        df["Details"] = df["Symbol"].apply(make_clickable)
+
+# Apply color styling manually (limited in HTML rendering)
+        styled_df = df.copy()
+        styled_df_html = styled_df.to_html(escape=False, index=False)
+        st.markdown("#### 📋 Watchlist")
+        st.markdown(styled_df_html, unsafe_allow_html=True)
 
     csv = df.to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
