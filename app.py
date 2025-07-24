@@ -15,21 +15,9 @@ def color_percent(val):
         return ''
 
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
-st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
+st_autorefresh(interval=600000, key="datarefresh")
 
-# --- Apply basic mobile-friendly style tweaks ---
-st.markdown("""
-    <style>
-        @media (max-width: 768px) {
-            h1 { font-size: 24px !important; }
-            .stButton button { width: 100% !important; }
-            .stSelectbox div[data-baseweb="select"] { width: 100% !important; }
-            .stDataFrameContainer { font-size: 12px !important; }
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- Top bar layout: logo + title (left), login/logout (right) ---
+# --- Top bar layout ---
 top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
 
 with top_col1:
@@ -53,6 +41,42 @@ with top_col3:
             else:
                 st.warning("Please enter a name to login.")
         st.stop()
+
+# --- Market Snapshot Section ---
+index_symbols = {
+    "NIFTY 50": "^NSEI",
+    "SENSEX": "^BSESN",
+    "NASDAQ": "^IXIC",
+    "DOW JONES": "^DJI",
+    "GOLD": "GC=F",
+    "SILVER": "SI=F",
+    "CRUDE OIL": "CL=F"
+}
+
+index_data = []
+for name, symbol in index_symbols.items():
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="1mo")
+        current = hist["Close"][-1]
+        previous = hist["Close"][-2]
+        day_change = ((current - previous) / previous) * 100
+        week_change = ((hist["Close"][-1] - hist["Close"][-5]) / hist["Close"][-5]) * 100 if len(hist) >= 5 else 0
+        month_change = ((hist["Close"][-1] - hist["Close"][0]) / hist["Close"][0]) * 100 if len(hist) > 0 else 0
+        index_data.append({
+            "Index": name,
+            "Current Price": f"{current:.2f}",
+            "Day Change (%)": f"{day_change:+.2f}%",
+            "1-Week Change (%)": f"{week_change:+.2f}%",
+            "1-Month Change (%)": f"{month_change:+.2f}%"
+        })
+    except Exception as e:
+        st.warning(f"Could not load {name}: {e}")
+
+st.subheader("🌐 Global & Commodity Market Snapshot")
+st.dataframe(pd.DataFrame(index_data).style.applymap(color_percent, subset=[
+    "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+]), use_container_width=True)
 
 # --- Stock Dictionary ---
 stock_dict = {
@@ -87,11 +111,9 @@ if not watchlist:
     st.info("Your watchlist is empty.")
 else:
     data_rows = []
-
     for symbol in watchlist:
         try:
             stock = yf.Ticker(symbol)
-
             hist_1mo = stock.history(period="1mo")
             hist_1wk = stock.history(period="7d")
             hist_1y = stock.history(period="1y")
@@ -107,6 +129,8 @@ else:
 
             company = stock_dict.get(symbol, "Unknown")
 
+            link = f"[Details](?stock={symbol})"
+
             data_rows.append({
                 "Symbol": symbol,
                 "Company": company,
@@ -115,16 +139,16 @@ else:
                 "1-Week Change (%)": f"{week_change:+.2f}%",
                 "1-Month Change (%)": f"{month_change:+.2f}%",
                 "52-Week High": f"{high_52:.2f}",
-                "52-Week Low": f"{low_52:.2f}"
+                "52-Week Low": f"{low_52:.2f}",
+                "Details": link
             })
-
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
     df = pd.DataFrame(data_rows)
-
     st.dataframe(df.style.applymap(color_percent, subset=[
-        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"]), use_container_width=True)
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+    ]), use_container_width=True)
 
     csv = df.to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
