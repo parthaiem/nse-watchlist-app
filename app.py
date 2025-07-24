@@ -104,7 +104,6 @@ if st.button("➕ Add"):
         st.success(f"{add_name} added!")
         st.rerun()
 
-# --- Display Watchlist ---
 st.subheader("📉 Your Watchlist")
 
 if not watchlist:
@@ -129,28 +128,23 @@ else:
             low_52 = hist_1y["Low"].min()
             company = stock_dict.get(symbol, "Unknown")
 
-            # --- Display in card layout ---
-            st.markdown(f"""
-                <div style="border: 1px solid #ccc; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                    <h4>{company} ({symbol})</h4>
-                    <p><strong>Current Price:</strong> ₹{current_price:.2f}</p>
-                    <p><strong>Day Change:</strong> <span style="color:{'green' if day_change >= 0 else 'red'}">{day_change:+.2f}%</span></p>
-                    <p><strong>1-Week Change:</strong> <span style="color:{'green' if week_change >= 0 else 'red'}">{week_change:+.2f}%</span></p>
-                    <p><strong>1-Month Change:</strong> <span style="color:{'green' if month_change >= 0 else 'red'}">{month_change:+.2f}%</span></p>
-                    <p><strong>52-Week High:</strong> ₹{high_52:.2f} &nbsp;|&nbsp; <strong>Low:</strong> ₹{low_52:.2f}</p>
-                </div>
-            """, unsafe_allow_html=True)
+            with st.expander(f"{company} ({symbol})"):
+                st.metric("Current Price", f"{current_price:.2f}", f"{day_change:+.2f}%")
+                st.metric("1-Week Change", f"{week_change:+.2f}%")
+                st.metric("1-Month Change", f"{month_change:+.2f}%")
+                st.metric("52-Week High", f"{high_52:.2f}")
+                st.metric("52-Week Low", f"{low_52:.2f}")
 
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                if st.button("🔍 View", key=f"view_{symbol}"):
-                    st.experimental_set_query_params(stock=symbol)
-                    st.switch_page("stock_detail_page.py")
-            with col2:
-                if st.button("🗑️ Remove", key=f"remove_{symbol}"):
-                    remove_from_watchlist(user, symbol)
-                    st.success(f"{symbol} removed from watchlist.")
-                    st.rerun()
+                cols = st.columns([1, 1])
+                with cols[0]:
+                    if st.button("🔍 View", key=f"view_{symbol}"):
+                        st.experimental_set_query_params(stock=symbol)
+                        st.switch_page("stock_detail_page.py")
+                with cols[1]:
+                    if st.button("🗑️ Remove", key=f"remove_{symbol}"):
+                        remove_from_watchlist(user, symbol)
+                        st.success(f"{symbol} removed from watchlist.")
+                        st.rerun()
 
             data_rows.append({
                 "Symbol": symbol,
@@ -166,8 +160,11 @@ else:
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    # Download CSV
     df = pd.DataFrame(data_rows)
+    st.dataframe(df.style.applymap(color_percent, subset=[
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+    ]), use_container_width=True)
+
     csv = df.to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
