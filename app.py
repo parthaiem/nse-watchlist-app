@@ -104,51 +104,7 @@ if st.button("➕ Add"):
         st.success(f"{add_name} added!")
         st.rerun()
 
-st.subheader("📉 Your Watchlist")
-
-if not watchlist:
-    st.info("Your watchlist is empty.")
-else:
-    data_rows = []
-
-    for symbol in watchlist:
-        try:
-            stock = yf.Ticker(symbol)
-            hist_1mo = stock.history(period="1mo")
-            hist_1wk = stock.history(period="7d")
-            hist_1y = stock.history(period="1y")
-
-            current_price = hist_1mo["Close"][-1]
-            previous_close = hist_1mo["Close"][-2]
-            day_change = ((current_price - previous_close) / previous_close) * 100
-            week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
-            month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
-
-            high_52 = hist_1y["High"].max()
-            low_52 = hist_1y["Low"].min()
-            company = stock_dict.get(symbol, "Unknown")
-
-            data_rows.append({
-                "Symbol": symbol,
-                "Company": company,
-                "Current Price": round(current_price, 2),
-                "Day Change (%)": f"{day_change:+.2f}%",
-                "1-Week Change (%)": f"{week_change:+.2f}%",
-                "1-Month Change (%)": f"{month_change:+.2f}%",
-                "52-Week High": f"{high_52:.2f}",
-                "52-Week Low": f"{low_52:.2f}"
-            })
-
-        except Exception as e:
-            st.error(f"Error fetching {symbol}: {e}")
-
-    df = pd.DataFrame(data_rows)
-    st.dataframe(df.style.applymap(color_percent, subset=[
-        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-    ]), use_container_width=True)
-
-    csv = df.to_csv(index=False)
-    st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
+# --- Display Watchlist ---
 st.subheader("📉 Your Watchlist")
 
 if not watchlist:
@@ -210,7 +166,7 @@ else:
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    # Optional: download CSV
+    # Download CSV
     df = pd.DataFrame(data_rows)
     csv = df.to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
