@@ -5,6 +5,7 @@ from datetime import datetime
 from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchlist
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objs as go
+
 def color_percent(val):
     try:
         val_float = float(val.strip('%+'))
@@ -15,6 +16,18 @@ def color_percent(val):
 
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
 st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
+
+# --- Apply basic mobile-friendly style tweaks ---
+st.markdown("""
+    <style>
+        @media (max-width: 768px) {
+            h1 { font-size: 24px !important; }
+            .stButton button { width: 100% !important; }
+            .stSelectbox div[data-baseweb="select"] { width: 100% !important; }
+            .stDataFrameContainer { font-size: 12px !important; }
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # --- Top bar layout: logo + title (left), login/logout (right) ---
 top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
@@ -86,8 +99,6 @@ else:
             current_price = hist_1mo["Close"][-1]
             previous_close = hist_1mo["Close"][-2]
             day_change = ((current_price - previous_close) / previous_close) * 100
-            
-
             week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
             month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
 
@@ -105,19 +116,12 @@ else:
                 "1-Month Change (%)": f"{month_change:+.2f}%",
                 "52-Week High": f"{high_52:.2f}",
                 "52-Week Low": f"{low_52:.2f}"
-                
             })
 
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
     df = pd.DataFrame(data_rows)
-
-    def color_negative_red(val):
-        if isinstance(val, (float, int)):
-            color = 'red' if val < 0 else 'green'
-            return f'color: {color}'
-        return ''
 
     st.dataframe(df.style.applymap(color_percent, subset=[
         "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"]), use_container_width=True)
