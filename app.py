@@ -6,16 +6,12 @@ from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchli
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objs as go
 
-def color_percent(val):
-    try:
-        val_float = float(val.strip('%+'))
-        color = 'green' if val_float >= 0 else 'red'
-        return f'color: {color}'
-    except:
-        return ''
-
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
-st_autorefresh(interval=600000, key="datarefresh")
+st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
+
+# --- Page Routing ---
+query_params = st.experimental_get_query_params()
+detail_symbol = query_params.get("symbol", [None])[0]
 
 # --- Top bar layout: logo + title (left), login/logout (right) ---
 top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
@@ -58,6 +54,38 @@ name_to_symbol = {v: k for k, v in stock_dict.items()}
 all_names = list(name_to_symbol.keys())
 
 user = st.session_state.user
+
+# --- Detail Page ---
+if detail_symbol:
+    stock = yf.Ticker(detail_symbol)
+    st.header(f"🔍 Details for {stock.info.get('shortName', detail_symbol)}")
+
+    # Chart
+    hist = stock.history(period="6mo")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], mode='lines', name='Close'))
+    fig.update_layout(title='6 Month Price Chart', xaxis_title='Date', yaxis_title='Price (INR)')
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Info
+    info = stock.info
+    st.markdown("### Company Info")
+    st.write(info.get("longBusinessSummary", "No business summary available."))
+
+    st.markdown("### Key Metrics")
+    st.write({
+        "P/E Ratio": info.get("trailingPE"),
+        "Market Cap": info.get("marketCap"),
+        "Revenue": info.get("totalRevenue"),
+        "Net Income": info.get("netIncomeToCommon")
+    })
+
+    if st.button("⬅ Back to Watchlist"):
+        st.experimental_set_query_params()
+        st.rerun()
+    st.stop()
+
+# --- Watchlist Page ---
 watchlist = get_watchlist(user)
 
 st.subheader("📌 Add to Watchlist")
@@ -74,39 +102,56 @@ st.subheader("📉 Your Watchlist")
 if not watchlist:
     st.info("Your watchlist is empty.")
 else:
+    data_rows = []
+
     for symbol in watchlist:
         try:
             stock = yf.Ticker(symbol)
-            hist = stock.history(period="6mo")
-            info = stock.info
 
-            current_price = hist["Close"][-1]
-            previous_close = hist["Close"][-2]
+            hist_1mo = stock.history(period="1mo")
+            hist_1wk = stock.history(period="7d")
+            hist_1y = stock.history(period="1y")
+
+            current_price = hist_1mo["Close"][-1]
+            previous_close = hist_1mo["Close"][-2]
             day_change = ((current_price - previous_close) / previous_close) * 100
+            week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
+            month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
+
+            high_52 = hist_1y["High"].max()
+            low_52 = hist_1y["Low"].min()
 
             company = stock_dict.get(symbol, "Unknown")
-            pe_ratio = info.get("trailingPE", "N/A")
-            revenue = info.get("totalRevenue", "N/A")
-            net_profit = info.get("grossProfits", "N/A")
-            description = info.get("longBusinessSummary", "No description available.")
 
-            with st.expander(f"🔍 {symbol} - {company}"):
-                st.markdown(f"### {company} ({symbol})")
-                st.markdown(f"**Current Price**: ₹{current_price:.2f}")
-                st.markdown(f"**Day Change**: {day_change:+.2f}%")
-                st.markdown(f"**P/E Ratio**: {pe_ratio}")
-                st.markdown(f"**Total Revenue**: {revenue}")
-                st.markdown(f"**Net Profit**: {net_profit}")
-                st.markdown("**Business Summary:**")
-                st.info(description)
-
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode="lines", name="Close Price"))
-                fig.update_layout(title="Price Trend (6 Months)", xaxis_title="Date", yaxis_title="Price")
-                st.plotly_chart(fig, use_container_width=True)
+            data_rows.append({
+                "Symbol": symbol,
+                "Company": f"[{company}](?symbol={symbol})",
+                "Current Price": round(current_price, 2),
+                "Day Change (%)": f"{day_change:+.2f}%",
+                "1-Week Change (%)": f"{week_change:+.2f}%",
+                "1-Month Change (%)": f"{month_change:+.2f}%",
+                "52-Week High": f"{high_52:.2f}",
+                "52-Week Low": f"{low_52:.2f}"
+            })
 
         except Exception as e:
-            st.error(f"Error loading {symbol}: {e}")
+            st.error(f"Error fetching {symbol}: {e}")
+
+    df = pd.DataFrame(data_rows)
+
+    def color_percent(val):
+        try:
+            val_float = float(val.strip('%+'))
+            color = 'green' if val_float >= 0 else 'red'
+            return f'color: {color}'
+        except:
+            return ''
+
+    st.dataframe(df.style.applymap(color_percent, subset=[
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"]), use_container_width=True)
+
+    csv = df.to_csv(index=False)
+    st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
 # --- Footer ---
 st.markdown("---")
