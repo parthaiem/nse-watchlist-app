@@ -4,7 +4,6 @@ import pandas as pd
 from datetime import datetime
 from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchlist
 from streamlit_autorefresh import st_autorefresh
-import plotly.graph_objs as go
 
 def color_percent(val):
     try:
@@ -61,8 +60,8 @@ for name, symbol in index_symbols.items():
         current = hist["Close"][-1]
         previous = hist["Close"][-2]
         day_change = ((current - previous) / previous) * 100
-        week_change = ((hist["Close"][-1] - hist["Close"][-5]) / hist["Close"][-5]) * 100 if len(hist) >= 5 else 0
-        month_change = ((hist["Close"][-1] - hist["Close"][0]) / hist["Close"][0]) * 100 if len(hist) > 0 else 0
+        week_change = ((current - hist["Close"][-5]) / hist["Close"][-5]) * 100 if len(hist) >= 5 else 0
+        month_change = ((current - hist["Close"][0]) / hist["Close"][0]) * 100 if len(hist) > 0 else 0
         index_data.append({
             "Index": name,
             "Current Price": f"{current:.2f}",
@@ -111,6 +110,7 @@ if not watchlist:
     st.info("Your watchlist is empty.")
 else:
     data_rows = []
+
     for symbol in watchlist:
         try:
             stock = yf.Ticker(symbol)
@@ -126,10 +126,25 @@ else:
 
             high_52 = hist_1y["High"].max()
             low_52 = hist_1y["Low"].min()
-
             company = stock_dict.get(symbol, "Unknown")
 
-            link = f"[Details](?stock={symbol})"
+            with st.expander(f"{company} ({symbol})"):
+                st.metric("Current Price", f"{current_price:.2f}", f"{day_change:+.2f}%")
+                st.metric("1-Week Change", f"{week_change:+.2f}%")
+                st.metric("1-Month Change", f"{month_change:+.2f}%")
+                st.metric("52-Week High", f"{high_52:.2f}")
+                st.metric("52-Week Low", f"{low_52:.2f}")
+
+                cols = st.columns([1, 1])
+                with cols[0]:
+                    if st.button("🔍 View", key=f"view_{symbol}"):
+                        st.experimental_set_query_params(stock=symbol)
+                        st.switch_page("stock_detail_page.py")
+                with cols[1]:
+                    if st.button("🗑️ Remove", key=f"remove_{symbol}"):
+                        remove_from_watchlist(user, symbol)
+                        st.success(f"{symbol} removed from watchlist.")
+                        st.rerun()
 
             data_rows.append({
                 "Symbol": symbol,
@@ -139,9 +154,9 @@ else:
                 "1-Week Change (%)": f"{week_change:+.2f}%",
                 "1-Month Change (%)": f"{month_change:+.2f}%",
                 "52-Week High": f"{high_52:.2f}",
-                "52-Week Low": f"{low_52:.2f}",
-                "Details": link
+                "52-Week Low": f"{low_52:.2f}"
             })
+
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
