@@ -4,59 +4,59 @@ import plotly.graph_objs as go
 
 st.set_page_config(page_title="Stock Details", layout="wide")
 
-# --- Parse selected stock ---
-query_params = st.query_params
-stock_symbol = query_params.get("stock", "")[0] if "stock" in query_params else None
+# --- Read stock symbol from query params ---
+query_params = st.experimental_get_query_params()
+symbol = query_params.get("stock", [None])[0]
 
-if not stock_symbol:
-    st.error("No stock selected. Please go back to the watchlist.")
+if not symbol:
+    st.error("No stock selected.")
     st.stop()
 
-stock = yf.Ticker(stock_symbol)
-info = stock.info
+ticker = yf.Ticker(symbol)
+info = ticker.info
 
-# --- Title and Back Button ---
-st.markdown("""
-    <div style='display: flex; justify-content: space-between; align-items: center;'>
-        <h2 style='margin: 0;'>📊 {}</h2>
-        <a href='/'><button style='padding: 8px 20px; font-size: 16px;'>⬅ Back</button></a>
-    </div>
-""".format(info.get("shortName", stock_symbol)), unsafe_allow_html=True)
+st.title(f"📊 {info.get('longName', symbol)} ({symbol})")
 
-# --- Stock Chart ---
-hist = stock.history(period="1y")
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], mode='lines', name='Close'))
-fig.update_layout(title=f"12-Month Price Chart for {stock_symbol}", xaxis_title="Date", yaxis_title="Price (INR)", height=400)
-st.plotly_chart(fig, use_container_width=True)
+# --- Price Chart ---
+st.subheader("📈 Price Chart (Last 6 Months)")
 
-# --- Key Metrics ---
-st.subheader("📌 Key Financial Metrics")
-metrics = {
-    "Current Price": f"₹ {info.get('currentPrice', 'NA')}",
-    "Market Cap": f"₹ {info.get('marketCap', 'NA'):,}" if info.get("marketCap") else "NA",
-    "P/E Ratio": info.get("trailingPE", "NA"),
-    "EPS (TTM)": info.get("trailingEps", "NA"),
-    "Revenue (TTM)": f"₹ {info.get('totalRevenue', 'NA'):,}" if info.get("totalRevenue") else "NA",
-    "Net Income": f"₹ {info.get('netIncomeToCommon', 'NA'):,}" if info.get("netIncomeToCommon") else "NA"
-}
-metric_cols = st.columns(len(metrics))
-for i, (k, v) in enumerate(metrics.items()):
-    metric_cols[i].metric(label=k, value=v)
-
-# --- Business Summary ---
-st.subheader("🏢 Business Overview")
-st.markdown(info.get("longBusinessSummary", "Business summary not available."))
-
-# --- Business Image (if available) ---
-if "logo_url" in info and info["logo_url"]:
-    st.image(info["logo_url"], width=120)
-
-# --- Latest News Section ---
-st.subheader("📰 Latest News")
-news = info.get("news", [])
-if news:
-    for article in news[:5]:
-        st.markdown(f"- [{article['title']}]({article['link']})")
+hist = ticker.history(period="6mo")
+if hist.empty:
+    st.warning("No historical data available.")
 else:
-    st.info("News not available from Yahoo Finance API.")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=hist.index, y=hist["Close"],
+        mode='lines', name="Close Price"
+    ))
+    fig.update_layout(title=f"{symbol} Closing Price", xaxis_title="Date", yaxis_title="Price (INR)")
+    st.plotly_chart(fig, use_container_width=True)
+
+# --- Key Financial Metrics ---
+st.subheader("📌 Key Metrics")
+
+col1, col2, col3 = st.columns(3)
+col1.metric("📈 Current Price", f"₹{hist['Close'][-1]:.2f}")
+col2.metric("52W High", f"₹{hist['High'].max():.2f}")
+col3.metric("52W Low", f"₹{hist['Low'].min():.2f}")
+
+col4, col5, col6 = st.columns(3)
+col4.metric("🧮 P/E Ratio", f"{info.get('trailingPE', 'N/A')}")
+col5.metric("📊 EPS (TTM)", f"{info.get('trailingEps', 'N/A')}")
+col6.metric("🏢 Market Cap", f"{info.get('marketCap', 'N/A'):,}")
+
+# --- Profit and Sales ---
+st.subheader("📋 Financial Summary (Latest)")
+
+st.write(f"**Net Profit:** ₹{info.get('netIncomeToCommon', 'N/A'):,}")
+st.write(f"**Revenue (Net Sales):** ₹{info.get('totalRevenue', 'N/A'):,}")
+st.write(f"**Book Value:** ₹{info.get('bookValue', 'N/A')}")
+st.write(f"**ROE:** {info.get('returnOnEquity', 'N/A'):.2%}" if info.get("returnOnEquity") else "ROE: N/A")
+
+# --- Company Overview ---
+st.subheader("🏢 Company Overview")
+business_summary = info.get("longBusinessSummary", "No company description available.")
+st.write(business_summary)
+
+# --- Back Button ---
+st.markdown("### 🔙 [Back to Watchlist](./)")
