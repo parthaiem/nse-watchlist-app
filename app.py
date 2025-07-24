@@ -15,7 +15,7 @@ def color_percent(val):
         return ''
 
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
-st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
+st_autorefresh(interval=600000, key="datarefresh")
 
 # --- Top bar layout: logo + title (left), login/logout (right) ---
 top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
@@ -41,42 +41,6 @@ with top_col3:
             else:
                 st.warning("Please enter a name to login.")
         st.stop()
-
-# --- Market Snapshot Section ---
-index_symbols = {
-    "NIFTY 50": "^NSEI",
-    "SENSEX": "^BSESN",
-    "NASDAQ": "^IXIC",
-    "DOW JONES": "^DJI",
-    "GOLD": "GC=F",
-    "SILVER": "SI=F",
-    "CRUDE OIL": "CL=F"
-}
-
-index_data = []
-for name, symbol in index_symbols.items():
-    try:
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="1mo")
-        current = hist["Close"][-1]
-        previous = hist["Close"][-2]
-        day_change = ((current - previous) / previous) * 100
-        week_change = ((hist["Close"][-1] - hist["Close"][-5]) / hist["Close"][-5]) * 100 if len(hist) >= 5 else 0
-        month_change = ((hist["Close"][-1] - hist["Close"][0]) / hist["Close"][0]) * 100 if len(hist) > 0 else 0
-        index_data.append({
-            "Index": name,
-            "Current Price": f"{current:.2f}",
-            "Day Change (%)": f"{day_change:+.2f}%",
-            "1-Week Change (%)": f"{week_change:+.2f}%",
-            "1-Month Change (%)": f"{month_change:+.2f}%"
-        })
-    except Exception as e:
-        st.warning(f"Could not load {name}: {e}")
-
-st.subheader("🌐 Global & Commodity Market Snapshot")
-st.dataframe(pd.DataFrame(index_data).style.applymap(color_percent, subset=[
-    "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-]), use_container_width=True)
 
 # --- Stock Dictionary ---
 stock_dict = {
@@ -110,49 +74,39 @@ st.subheader("📉 Your Watchlist")
 if not watchlist:
     st.info("Your watchlist is empty.")
 else:
-    data_rows = []
-
     for symbol in watchlist:
         try:
             stock = yf.Ticker(symbol)
+            hist = stock.history(period="6mo")
+            info = stock.info
 
-            hist_1mo = stock.history(period="1mo")
-            hist_1wk = stock.history(period="7d")
-            hist_1y = stock.history(period="1y")
-
-            current_price = hist_1mo["Close"][-1]
-            previous_close = hist_1mo["Close"][-2]
+            current_price = hist["Close"][-1]
+            previous_close = hist["Close"][-2]
             day_change = ((current_price - previous_close) / previous_close) * 100
-            week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
-            month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
-
-            high_52 = hist_1y["High"].max()
-            low_52 = hist_1y["Low"].min()
 
             company = stock_dict.get(symbol, "Unknown")
+            pe_ratio = info.get("trailingPE", "N/A")
+            revenue = info.get("totalRevenue", "N/A")
+            net_profit = info.get("grossProfits", "N/A")
+            description = info.get("longBusinessSummary", "No description available.")
 
-            data_rows.append({
-                "Symbol": symbol,
-                "Company": company,
-                "Current Price": round(current_price, 2),
-                "Day Change (%)": f"{day_change:+.2f}%",
-                "1-Week Change (%)": f"{week_change:+.2f}%",
-                "1-Month Change (%)": f"{month_change:+.2f}%",
-                "52-Week High": f"{high_52:.2f}",
-                "52-Week Low": f"{low_52:.2f}"
-            })
+            with st.expander(f"🔍 {symbol} - {company}"):
+                st.markdown(f"### {company} ({symbol})")
+                st.markdown(f"**Current Price**: ₹{current_price:.2f}")
+                st.markdown(f"**Day Change**: {day_change:+.2f}%")
+                st.markdown(f"**P/E Ratio**: {pe_ratio}")
+                st.markdown(f"**Total Revenue**: {revenue}")
+                st.markdown(f"**Net Profit**: {net_profit}")
+                st.markdown("**Business Summary:**")
+                st.info(description)
+
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode="lines", name="Close Price"))
+                fig.update_layout(title="Price Trend (6 Months)", xaxis_title="Date", yaxis_title="Price")
+                st.plotly_chart(fig, use_container_width=True)
 
         except Exception as e:
-            st.error(f"Error fetching {symbol}: {e}")
-
-    df = pd.DataFrame(data_rows)
-
-    st.dataframe(df.style.applymap(color_percent, subset=[
-        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-    ]), use_container_width=True)
-
-    csv = df.to_csv(index=False)
-    st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
+            st.error(f"Error loading {symbol}: {e}")
 
 # --- Footer ---
 st.markdown("---")
