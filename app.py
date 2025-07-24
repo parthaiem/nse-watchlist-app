@@ -142,62 +142,39 @@ else:
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    # Render HTML table with clickable view buttons
     table_html = """
     <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 8px 10px;
-            border: 1px solid #ccc;
-            text-align: center;
-        }
-        th {
-            background-color: #f4f4f4;
-        }
-        td a {
-            text-decoration: none;
-            background-color: #007bff;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 14px;
-        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 10px; border: 1px solid #ccc; text-align: center; }
+        th { background-color: #f4f4f4; }
+        a.btn { text-decoration: none; padding: 5px 10px; background-color: #007bff; color: white; border-radius: 5px; }
     </style>
     <table>
         <thead>
             <tr>
-                <th>Symbol</th>
-                <th>Company</th>
-                <th>Current Price</th>
-                <th>Day Change (%)</th>
-                <th>1-Week Change (%)</th>
-                <th>1-Month Change (%)</th>
-                <th>52-Week High</th>
-                <th>52-Week Low</th>
-                <th>Details</th>
+                <th>Symbol</th><th>Company</th><th>Current Price</th>
+                <th>Day Change</th><th>1-Week</th><th>1-Month</th>
+                <th>52-Week High</th><th>52-Week Low</th><th>Details</th>
             </tr>
         </thead>
         <tbody>
     """
 
     for row in data_rows:
-        def color(val):
-            return f"<span style='color: {'green' if '-' not in val else 'red'}'>{val}</span>"
+        def colored(val):
+            return f"<span style='color:{'green' if '-' not in val else 'red'}'>{val}</span>"
 
         table_html += f"""
         <tr>
             <td>{row['Symbol']}</td>
             <td>{row['Company']}</td>
             <td>{row['Current Price']}</td>
-            <td>{color(row['Day Change (%)'])}</td>
-            <td>{color(row['1-Week Change (%)'])}</td>
-            <td>{color(row['1-Month Change (%)'])}</td>
+            <td>{colored(row['Day Change (%)'])}</td>
+            <td>{colored(row['1-Week Change (%)'])}</td>
+            <td>{colored(row['1-Month Change (%)'])}</td>
             <td>{row['52-Week High']}</td>
             <td>{row['52-Week Low']}</td>
-            <td><a href='stock_detail_page?stock={row['Symbol']}'>View</a></td>
+            <td><a class='btn' href='stock_detail_page?stock={row['Symbol']}'>View</a></td>
         </tr>
         """
 
