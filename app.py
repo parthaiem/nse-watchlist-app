@@ -144,13 +144,13 @@ else:
             col1, col2 = st.columns([1, 1])
             with col1:
                 if st.button("🔍 View", key=f"view_{symbol}"):
-                    st.experimental_set_query_params(stock=symbol)
-                    st.switch_page("stock_detail_page.py")
+                    st.query_params["stock"] = symbol
+                    st.switch_page("pages/stock_detail_page.py")  # ✅ must be relative path to pages/
             with col2:
                 if st.button("🗑️ Remove", key=f"remove_{symbol}"):
-                    remove_from_watchlist(user, symbol)
-                    st.success(f"{symbol} removed from watchlist.")
-                    st.rerun()
+                     remove_from_watchlist(user, symbol)
+                     st.success(f"{symbol} removed from watchlist.")
+                     st.rerun()
 
             data_rows.append({
                 "Symbol": symbol,
