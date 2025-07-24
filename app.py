@@ -129,6 +129,8 @@ else:
 
             company = stock_dict.get(symbol, "Unknown")
 
+            link = f"[Details](?stock={symbol})"
+
             data_rows.append({
                 "Symbol": symbol,
                 "Company": company,
@@ -137,51 +139,18 @@ else:
                 "1-Week Change (%)": f"{week_change:+.2f}%",
                 "1-Month Change (%)": f"{month_change:+.2f}%",
                 "52-Week High": f"{high_52:.2f}",
-                "52-Week Low": f"{low_52:.2f}"
+                "52-Week Low": f"{low_52:.2f}",
+                "Details": link
             })
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    table_html = """
-    <style>
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 8px 10px; border: 1px solid #ccc; text-align: center; }
-        th { background-color: #f4f4f4; }
-        a.btn { text-decoration: none; padding: 5px 10px; background-color: #007bff; color: white; border-radius: 5px; }
-    </style>
-    <table>
-        <thead>
-            <tr>
-                <th>Symbol</th><th>Company</th><th>Current Price</th>
-                <th>Day Change</th><th>1-Week</th><th>1-Month</th>
-                <th>52-Week High</th><th>52-Week Low</th><th>Details</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
+    df = pd.DataFrame(data_rows)
+    st.dataframe(df.style.applymap(color_percent, subset=[
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+    ]), use_container_width=True)
 
-    for row in data_rows:
-        def colored(val):
-            return f"<span style='color:{'green' if '-' not in val else 'red'}'>{val}</span>"
-
-        table_html += f"""
-        <tr>
-            <td>{row['Symbol']}</td>
-            <td>{row['Company']}</td>
-            <td>{row['Current Price']}</td>
-            <td>{colored(row['Day Change (%)'])}</td>
-            <td>{colored(row['1-Week Change (%)'])}</td>
-            <td>{colored(row['1-Month Change (%)'])}</td>
-            <td>{row['52-Week High']}</td>
-            <td>{row['52-Week Low']}</td>
-            <td><a class='btn' href='stock_detail_page?stock={row['Symbol']}'>View</a></td>
-        </tr>
-        """
-
-    table_html += "</tbody></table>"
-    st.markdown(table_html, unsafe_allow_html=True)
-
-    csv = pd.DataFrame(data_rows).to_csv(index=False)
+    csv = df.to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
 # --- Footer ---
