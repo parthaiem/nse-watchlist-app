@@ -129,8 +129,6 @@ else:
 
             company = stock_dict.get(symbol, "Unknown")
 
-            link = f"[Details](?stock={symbol})"
-
             data_rows.append({
                 "Symbol": symbol,
                 "Company": company,
@@ -139,28 +137,69 @@ else:
                 "1-Week Change (%)": f"{week_change:+.2f}%",
                 "1-Month Change (%)": f"{month_change:+.2f}%",
                 "52-Week High": f"{high_52:.2f}",
-                "52-Week Low": f"{low_52:.2f}",
-                "Details": link
+                "52-Week Low": f"{low_52:.2f}"
             })
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    #df = pd.DataFrame(data_rows)
-    #st.dataframe(df.style.applymap(color_percent, subset=[
-     #   "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-    ])#, use_container_width=True)
-    # Convert dataframe to HTML to enable links
-    def make_clickable(symbol):
-        return f'<a href="/?stock={symbol}" target="_self">Details</a>'
-        df["Details"] = df["Symbol"].apply(make_clickable)
+    # Render custom HTML table with links
+    table_html = """
+    <style>
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    th, td {
+        padding: 8px 12px;
+        text-align: center;
+        border: 1px solid #ddd;
+        font-size: 15px;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+    tr:hover {
+        background-color: #f9f9f9;
+    }
+    a {
+        text-decoration: none;
+        color: #0072C6;
+    }
+    </style>
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Company</th>
+                <th>Current Price</th>
+                <th>Day Change (%)</th>
+                <th>1-Week Change (%)</th>
+                <th>1-Month Change (%)</th>
+                <th>52-Week High</th>
+                <th>52-Week Low</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    for row in data_rows:
+        table_html += f"""
+        <tr>
+            <td>{row['Symbol']}</td>
+            <td>{row['Company']}</td>
+            <td>{row['Current Price']}</td>
+            <td style='color: {'green' if '+' in row['Day Change (%)'] else 'red'}'>{row['Day Change (%)']}</td>
+            <td style='color: {'green' if '+' in row['1-Week Change (%)'] else 'red'}'>{row['1-Week Change (%)']}</td>
+            <td style='color: {'green' if '+' in row['1-Month Change (%)'] else 'red'}'>{row['1-Month Change (%)']}</td>
+            <td>{row['52-Week High']}</td>
+            <td>{row['52-Week Low']}</td>
+            <td><a href='?stock={row['Symbol']}'>View</a></td>
+        </tr>
+        """
+    table_html += "</tbody></table>"
+    st.markdown(table_html, unsafe_allow_html=True)
 
-# Apply color styling manually (limited in HTML rendering)
-        styled_df = df.copy()
-        styled_df_html = styled_df.to_html(escape=False, index=False)
-        st.markdown("#### 📋 Watchlist")
-        st.markdown(styled_df_html, unsafe_allow_html=True)
-
-    csv = df.to_csv(index=False)
+    csv = pd.DataFrame(data_rows).to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
 # --- Footer ---
