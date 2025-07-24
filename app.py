@@ -15,17 +15,14 @@ def color_percent(val):
         return ''
 
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
-st_autorefresh(interval=600000, key="datarefresh")
+st_autorefresh(interval=600000, key="datarefresh")  # 10 minutes
 
 # --- Top bar layout ---
 top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
-
 with top_col1:
     st.image("logo.jpg", width=100)
-
 with top_col2:
     st.markdown("<h1 style='padding-top: 10px;'>📈 NSE Stock Watchlist</h1>", unsafe_allow_html=True)
-
 with top_col3:
     if "user" in st.session_state:
         st.markdown(f"<p style='text-align:right; padding-top: 25px;'>👤 Logged in as <strong>{st.session_state.user}</strong></p>", unsafe_allow_html=True)
@@ -128,10 +125,11 @@ else:
             low_52 = hist_1y["Low"].min()
 
             company = stock_dict.get(symbol, "Unknown")
+            stock_link = f"[{company}](?stock={symbol})"
 
             data_rows.append({
                 "Symbol": symbol,
-                "Company": company,
+                "Company": stock_link,
                 "Current Price": round(current_price, 2),
                 "Day Change (%)": f"{day_change:+.2f}%",
                 "1-Week Change (%)": f"{week_change:+.2f}%",
@@ -139,50 +137,17 @@ else:
                 "52-Week High": f"{high_52:.2f}",
                 "52-Week Low": f"{low_52:.2f}"
             })
+
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    # Create HTML table with View links
-    table_html = """
-    <table style='width:100%; border-collapse: collapse;' border='1'>
-        <thead>
-            <tr style='background-color:#f0f2f6;'>
-                <th>Symbol</th>
-                <th>Company</th>
-                <th>Current Price</th>
-                <th>Day Change (%)</th>
-                <th>1-Week Change (%)</th>
-                <th>1-Month Change (%)</th>
-                <th>52-Week High</th>
-                <th>52-Week Low</th>
-                <th>Details</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
+    df = pd.DataFrame(data_rows)
+    st.markdown("Click on a company name to view details.")
+    st.dataframe(df.style.applymap(color_percent, subset=[
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+    ]), use_container_width=True)
 
-    for row in data_rows:
-        def color(val):
-            return f"<span style='color:{'green' if '-' not in val else 'red'}'>{val}</span>"
-
-        table_html += f"""
-        <tr>
-            <td>{row['Symbol']}</td>
-            <td>{row['Company']}</td>
-            <td>{row['Current Price']}</td>
-            <td>{color(row['Day Change (%)'])}</td>
-            <td>{color(row['1-Week Change (%)'])}</td>
-            <td>{color(row['1-Month Change (%)'])}</td>
-            <td>{row['52-Week High']}</td>
-            <td>{row['52-Week Low']}</td>
-            <td><a href='?stock={row["Symbol"]}' style='text-decoration:none;'>🔍 View</a></td>
-        </tr>
-        """
-
-    table_html += "</tbody></table>"
-    st.markdown(table_html, unsafe_allow_html=True)
-
-    csv = pd.DataFrame(data_rows).to_csv(index=False)
+    csv = df.to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
 # --- Footer ---
@@ -197,3 +162,43 @@ st.markdown(f"""
         <a href="https://angel-one.onelink.me/Wjgr/m8njiek1">📂 Open DMAT</a>
     </div>
 """, unsafe_allow_html=True)
+
+# --- Stock Detail Page ---
+query_params = st.query_params
+if "stock" in query_params:
+    symbol = query_params["stock"]
+    stock = yf.Ticker(symbol)
+    info = stock.info
+
+    st.markdown("---")
+    st.markdown(f"## {info.get('longName', symbol)} ({symbol})")
+
+    hist = stock.history(period="12mo")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], mode='lines', name='Close'))
+    fig.update_layout(title="Price (Last 12 Months)", xaxis_title="Date", yaxis_title="Price")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("### 📊 Key Financials")
+    pe_ratio = info.get("trailingPE", "N/A")
+    revenue = info.get("totalRevenue", "N/A")
+    net_income = info.get("netIncomeToCommon", "N/A")
+
+    st.markdown(f"- **P/E Ratio:** {pe_ratio}")
+    st.markdown(f"- **Total Revenue:** {revenue:,}" if isinstance(revenue, int) else f"- **Total Revenue:** {revenue}")
+    st.markdown(f"- **Net Income:** {net_income:,}" if isinstance(net_income, int) else f"- **Net Income:** {net_income}")
+
+    st.markdown("### 🏢 Business Summary")
+    st.write(info.get("longBusinessSummary", "Not available"))
+
+    image_url = info.get("logo_url")
+    if image_url:
+        st.image(image_url, width=120)
+
+    st.markdown("### 📰 Latest News")
+    st.info("News coming soon...")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🔙 Back to Watchlist"):
+        st.query_params.clear()
+        st.rerun()
