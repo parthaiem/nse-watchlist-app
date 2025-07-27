@@ -383,14 +383,7 @@ else:
             st.rerun()
         
         # Export to CSV
-        csv = df.to_csv(index=False)
-        st.download_button(
-            "📥 Export to CSV", 
-            csv, 
-            file_name="watchlist.csv", 
-            mime="text/csv",
-            help="Download your watchlist as a CSV file"
-        )
+        
 
 # --- Footer ---
 st.markdown("---")
