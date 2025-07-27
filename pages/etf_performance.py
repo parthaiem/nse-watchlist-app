@@ -101,6 +101,7 @@ def get_historical_chart(symbol, name):
             hovermode="x unified",
             showlegend=False,
             margin=dict(l=20, r=20, t=40, b=20)
+        )
         return fig
     except Exception as e:
         st.error(f"Error generating chart for {name}: {str(e)}")
