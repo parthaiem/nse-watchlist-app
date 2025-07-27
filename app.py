@@ -131,14 +131,18 @@ def stock_search_component():
                     st.warning("Couldn't fetch price data")
             
             with col2:
-                if st.button(f"➕ Add", key=f"add_{symbol}"):
-                    if symbol not in st.session_state.watchlist:
+                if symbol in st.session_state.watchlist:
+                    if st.button(f"🗑️ Remove", key=f"remove_{symbol}"):
+                        remove_from_watchlist(st.session_state.user, symbol)
+                        st.session_state.watchlist = get_watchlist(st.session_state.user)
+                        st.success(f"Removed {name} from watchlist!")
+                        st.rerun()
+                else:
+                    if st.button(f"➕ Add", key=f"add_{symbol}"):
                         add_to_watchlist(st.session_state.user, symbol)
                         st.session_state.watchlist = get_watchlist(st.session_state.user)
                         st.success(f"Added {name} to watchlist!")
                         st.rerun()
-                    else:
-                        st.warning("Already in watchlist")
     
     return None
 
@@ -258,18 +262,6 @@ else:
             color: #dc3545;
             font-weight: bold;
         }
-        .remove-btn {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8em;
-        }
-        .remove-btn:hover {
-            background-color: #c82333;
-        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -311,12 +303,12 @@ else:
             watchlist_data.append({
                 "Company": company_name,
                 "Symbol": symbol,
-                "Price (₹)": f"{current_price:,.2f}",
-                "Day %": f"{day_change:+.2f}%",
-                "Week %": f"{week_change:+.2f}%",
-                "Month %": f"{month_change:+.2f}%",
-                "52W High": f"{high_52:,.2f}",
-                "52W Low": f"{low_52:,.2f}"
+                "Price (₹)": current_price,
+                "Day %": day_change,
+                "Week %": week_change,
+                "Month %": month_change,
+                "52W High": high_52,
+                "52W Low": low_52
             })
         except Exception as e:
             st.error(f"Error fetching {symbol}: {str(e)}")
@@ -327,14 +319,19 @@ else:
         
         # Style the DataFrame
         def style_change(val):
-            try:
-                val_float = float(val.strip('%+'))
-                color = 'green' if val_float >= 0 else 'red'
+            if isinstance(val, (int, float)):
+                color = 'green' if val >= 0 else 'red'
                 return f'color: {color}; font-weight: bold'
-            except:
-                return ''
+            return ''
         
-        styled_df = df.style.applymap(style_change, subset=["Day %", "Week %", "Month %"])
+        styled_df = df.style.format({
+            "Price (₹)": "₹{:,.2f}",
+            "Day %": "{:+.2f}%",
+            "Week %": "{:+.2f}%",
+            "Month %": "{:+.2f}%",
+            "52W High": "₹{:,.2f}",
+            "52W Low": "₹{:,.2f}"
+        }).applymap(style_change, subset=["Day %", "Week %", "Month %"])
         
         # Display the styled DataFrame
         st.dataframe(
@@ -344,12 +341,12 @@ else:
             column_config={
                 "Company": "Company",
                 "Symbol": "Symbol",
-                "Price (₹)": st.column_config.NumberColumn("Price (₹)", format="₹%.2f"),
+                "Price (₹)": "Price",
                 "Day %": "Day Change",
                 "Week %": "Week Change",
                 "Month %": "Month Change",
-                "52W High": st.column_config.NumberColumn("52W High", format="₹%.2f"),
-                "52W Low": st.column_config.NumberColumn("52W Low", format="₹%.2f")
+                "52W High": "52W High",
+                "52W Low": "52W Low"
             }
         )
         
