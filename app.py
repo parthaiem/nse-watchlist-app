@@ -173,6 +173,8 @@ with top_col3:
         st.stop()
 
 # --- Market Snapshot Section ---
+st.subheader("🌐 Global & Commodity Market Snapshot")
+
 index_symbols = {
     "NIFTY 50": "^NSEI",
     "SENSEX": "^BSESN",
@@ -203,12 +205,14 @@ for name, symbol in index_symbols.items():
     except Exception as e:
         st.warning(f"Could not load {name}: {e}")
 
-st.subheader("🌐 Global & Commodity Market Snapshot")
 st.dataframe(pd.DataFrame(index_data).style.applymap(color_percent, subset=[
     "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
 ]), use_container_width=True)
 
-# --- Stock Watchlist Section ---
+# --- Search Stocks Section ---
+stock_search_component()
+
+# --- Watchlist Section ---
 st.subheader("📉 Your Watchlist")
 
 if not st.session_state.watchlist:
