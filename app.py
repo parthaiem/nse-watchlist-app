@@ -351,38 +351,7 @@ else:
         )
         
         # Add remove functionality
-        st.markdown("---")
-        st.subheader("Manage Watchlist")
         
-        # Create a list to track stocks to remove
-        to_remove = []
-        
-        # Display each stock with a remove button
-        for symbol in st.session_state.watchlist:
-            cols = st.columns([4, 2, 1])
-            company_name = st.session_state.search_results.get(symbol, symbol)
-            
-            # Get current price for display
-            try:
-                current_price = yf.Ticker(symbol).history(period='1d')['Close'][-1]
-                price_display = f"₹{current_price:,.2f}"
-            except:
-                price_display = "Price: N/A"
-            
-            cols[0].markdown(f"**{company_name}**")
-            cols[1].markdown(f"*{price_display}*")
-            
-            if cols[2].button("Remove", key=f"remove_{symbol}"):
-                to_remove.append(symbol)
-        
-        # Process removals
-        for symbol in to_remove:
-            remove_from_watchlist(st.session_state.user, symbol)
-            st.session_state.watchlist = get_watchlist(st.session_state.user)
-            st.success(f"Removed {symbol} from watchlist")
-            st.rerun()
-        
-        # Export to CSV
         
 
 # --- Footer ---
