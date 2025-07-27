@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
+from datetime import datetime
 
 # Custom CSS for styling
 st.markdown("""
@@ -35,6 +36,12 @@ st.markdown("""
             border: 1px solid #e0e0e0;
             border-radius: 8px;
         }
+        .add-stock-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -46,42 +53,87 @@ def color_percent(val):
     except:
         return ''
 
-# Stock dictionary
-stock_dict = {
-    "TCS.NS": "TATA CONSULTANCY SERVICES",
-    "INFY.NS": "INFOSYS",
-    "WIPRO.NS": "WIPRO",
-    "HCLTECH.NS": "HCL TECHNOLOGIES",
-    "RELIANCE.NS": "RELIANCE INDUSTRIES",
-    "SBIN.NS": "STATE BANK OF INDIA",
-    "ICICIBANK.NS": "ICICI BANK",
-    "TECHM.NS": "TECH MAHINDRA",
-    "HDFCBANK.NS": "HDFC BANK",
-    "BHARTIARTL.NS": "BHARTI AIRTEL",
-    "ITC.NS": "ITC LIMITED",
-    "LT.NS": "LARSEN & TOUBRO",
-    "KOTAKBANK.NS": "KOTAK MAHINDRA BANK",
-    "ASIANPAINT.NS": "ASIAN PAINTS",
-    "BAJFINANCE.NS": "BAJAJ FINANCE"
-}
-
 # Initialize session state
 if 'selected_stock' not in st.session_state:
     st.session_state.selected_stock = None
 if 'watchlist' not in st.session_state:
     st.session_state.watchlist = ["INFY.NS", "RELIANCE.NS"]  # Default watchlist
 
+# Dynamic stock dictionary loading
+@st.cache_data(ttl=86400)  # Cache for 1 day
+def load_nse_stocks():
+    try:
+        # Get top NSE stocks (this is a placeholder - you might need a real API)
+        nifty50 = yf.Ticker("^NSEI").components
+        stocks = {}
+        for symbol in nifty50:
+            try:
+                ticker = yf.Ticker(f"{symbol}.NS")
+                info = ticker.info
+                stocks[f"{symbol}.NS"] = info.get('longName', symbol)
+            except:
+                continue
+        return stocks
+    except:
+        # Fallback to a default list if API fails
+        return {
+            "TCS.NS": "Tata Consultancy Services",
+            "INFY.NS": "Infosys",
+            "RELIANCE.NS": "Reliance Industries",
+            "HDFCBANK.NS": "HDFC Bank",
+            "ICICIBANK.NS": "ICICI Bank",
+            "HCLTECH.NS": "HCL Technologies",
+            "SBIN.NS": "State Bank of India",
+            "BHARTIARTL.NS": "Bharti Airtel",
+            "LT.NS": "Larsen & Toubro",
+            "KOTAKBANK.NS": "Kotak Mahindra Bank",
+            "ITC.NS": "ITC Limited",
+            "ASIANPAINT.NS": "Asian Paints",
+            "BAJFINANCE.NS": "Bajaj Finance"
+        }
+
+# Load stocks dynamically
+stock_dict = load_nse_stocks()
+name_to_symbol = {v: k for k, v in stock_dict.items()}
+
 # Page layout
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
 
-# --- Header ---
-st.title("📈 NSE Stock Watchlist")
+# --- Header with Add to Watchlist ---
+col1, col2 = st.columns([3, 2])
+with col1:
+    st.title("📈 NSE Stock Watchlist")
+with col2:
+    with st.expander("➕ Add to Watchlist", expanded=False):
+        search_term = st.text_input("Search stocks", "")
+        
+        # Filter stocks based on search
+        filtered_stocks = [
+            name for name in stock_dict.values() 
+            if search_term.lower() in name.lower()
+        ]
+        
+        selected_stock = st.selectbox(
+            "Select stock to add",
+            filtered_stocks,
+            index=0 if not filtered_stocks else None,
+            key="add_stock_select"
+        )
+        
+        if st.button("Add to Watchlist"):
+            symbol = name_to_symbol[selected_stock]
+            if symbol not in st.session_state.watchlist:
+                st.session_state.watchlist.append(symbol)
+                st.success(f"Added {selected_stock} to watchlist!")
+                st.rerun()
+            else:
+                st.warning(f"{selected_stock} is already in your watchlist")
 
 # --- Watchlist Display ---
 st.subheader("📉 Your Watchlist")
 
 if not st.session_state.watchlist:
-    st.info("Your watchlist is empty.")
+    st.info("Your watchlist is empty. Add stocks using the 'Add to Watchlist' section above.")
 else:
     # Get data for all watchlist stocks
     @st.cache_data(ttl=300)
@@ -242,29 +294,11 @@ else:
                         )
                         st.plotly_chart(fig, use_container_width=True)
 
-# --- Add Stock Section ---
-st.subheader("📌 Add to Watchlist")
-
-name_to_symbol = {v: k for k, v in stock_dict.items()}
-add_col1, add_col2 = st.columns([3, 1])
-with add_col1:
-    add_name = st.selectbox(
-        "Select stock to add",
-        options=list(name_to_symbol.keys()),
-        label_visibility="collapsed"
-    )
-with add_col2:
-    if st.button("➕ Add"):
-        symbol = name_to_symbol[add_name]
-        if symbol not in st.session_state.watchlist:
-            st.session_state.watchlist.append(symbol)
-            st.rerun()
-
 # --- Footer ---
 st.markdown("---")
 st.markdown("""
     <div style='text-align: center;'>
         <strong>📊 Stock Analysis Platform</strong><br>
-        Data provided by Yahoo Finance
+        Data provided by Yahoo Finance | Last updated: {date}
     </div>
-""", unsafe_allow_html=True)
+""".format(date=datetime.now().strftime("%Y-%m-%d %H:%M")), unsafe_allow_html=True)
