@@ -62,52 +62,52 @@ def color_percent(val):
 
 # Function to get market data
 def get_market_data():
-    # Major Global Indices
+    # Major Global Indices with country flags
     global_indices = {
-        "NIFTY 50": "^NSEI",
-        "SENSEX": "^BSESN",
-        "NIFTY BANK": "^NSEBANK",
-        "NASDAQ": "^IXIC",
-        "S&P 500": "^GSPC",
-        "DOW JONES": "^DJI",
-        "FTSE 100": "^FTSE",
-        "DAX": "^GDAXI",
-        "NIKKEI 225": "^N225",
-        "HANG SENG": "^HSI",
-        "SHANGHAI COMP": "000001.SS"
+        "🇮🇳 NIFTY 50": "^NSEI",
+        "🇮🇳 SENSEX": "^BSESN",
+        "🇮🇳 NIFTY BANK": "^NSEBANK",
+        "🇺🇸 NASDAQ": "^IXIC",
+        "🇺🇸 S&P 500": "^GSPC",
+        "🇺🇸 DOW JONES": "^DJI",
+        "🇬🇧 FTSE 100": "^FTSE",
+        "🇩🇪 DAX": "^GDAXI",
+        "🇯🇵 NIKKEI 225": "^N225",
+        "🇭🇰 HANG SENG": "^HSI",
+        "🇨🇳 SHANGHAI COMP": "000001.SS"
     }
 
     # Commodities
     commodities = {
-        "GOLD": "GC=F",
-        "SILVER": "SI=F",
-        "CRUDE OIL": "CL=F",
-        "BRENT CRUDE": "BZ=F",
-        "NATURAL GAS": "NG=F",
-        "COPPER": "HG=F"
+        "🟡 GOLD": "GC=F",
+        "⚪ SILVER": "SI=F",
+        "🛢️ CRUDE OIL": "CL=F",
+        "🛢️ BRENT CRUDE": "BZ=F",
+        "💨 NATURAL GAS": "NG=F",
+        "🟠 COPPER": "HG=F"
     }
 
     # Indian Sectoral Indices
     indian_sectors = {
-        "NIFTY IT": "^CNXIT",
-        "NIFTY AUTO": "^CNXAUTO",
-        "NIFTY BANK": "^CNXBANK",
-        "NIFTY FIN SERVICE": "^CNXFIN",
-        "NIFTY FMCG": "^CNXFMCG",
-        "NIFTY MEDIA": "^CNXMEDIA",
-        "NIFTY METAL": "^CNXMETAL",
-        "NIFTY PHARMA": "^CNXPHARMA",
-        "NIFTY PSU BANK": "^CNXPSUBANK",
-        "NIFTY REALTY": "^CNXREALTY"
+        "💻 NIFTY IT": "^CNXIT",
+        "🚗 NIFTY AUTO": "^CNXAUTO",
+        "🏦 NIFTY BANK": "^CNXBANK",
+        "💰 NIFTY FIN SERVICE": "^CNXFIN",
+        "🛒 NIFTY FMCG": "^CNXFMCG",
+        "🎬 NIFTY MEDIA": "^CNXMEDIA",
+        "🏗️ NIFTY METAL": "^CNXMETAL",
+        "💊 NIFTY PHARMA": "^CNXPHARMA",
+        "🏛️ NIFTY PSU BANK": "^CNXPSUBANK",
+        "🏢 NIFTY REALTY": "^CNXREALTY"
     }
 
     # Cryptocurrencies
     cryptocurrencies = {
-        "BITCOIN": "BTC-USD",
-        "ETHEREUM": "ETH-USD",
-        "BNB": "BNB-USD",
-        "XRP": "XRP-USD",
-        "SOLANA": "SOL-USD"
+        "₿ BITCOIN": "BTC-USD",
+        "Ξ ETHEREUM": "ETH-USD",
+        "🅱️ BNB": "BNB-USD",
+        "✕ XRP": "XRP-USD",
+        "◎ SOLANA": "SOL-USD"
     }
 
     # Get all data
