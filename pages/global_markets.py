@@ -10,10 +10,6 @@ if 'watchlist' not in st.session_state:
 
 # Common header function
 def show_header():
-    # Add map image at the top
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/1200px-World_map_-_low_resolution.svg.png", 
-             use_column_width=True, caption="Global Market Coverage")
-    
     # --- Top bar layout ---
     top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
 
@@ -203,7 +199,10 @@ def get_market_data():
 def main():
     st.set_page_config(page_title="Global Market Dashboard", layout="wide")
     
-    # Custom CSS
+    # Show header
+    show_header()
+    
+    # Market overview
     st.markdown("""
     <style>
         .big-font {
@@ -219,15 +218,8 @@ def main():
         .dataframe th, .dataframe td {
             white-space: nowrap;
         }
-        /* Make the map image slightly transparent */
-        .stImage img {
-            opacity: 0.9;
-        }
     </style>
     """, unsafe_allow_html=True)
-    
-    # Show header with map
-    show_header()
     
     # Current time
     st.markdown(f"<div class='big-font'>Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>", 
