@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchlist
 from streamlit_autorefresh import st_autorefresh
@@ -184,6 +185,7 @@ else:
 
                 company = stock_dict.get(symbol, "Unknown")
 
+                # Updated link using st.query_params
                 link = f"<a class='view-charts' href='?stock={symbol}'>View Charts</a>"
 
                 data_rows.append({
@@ -210,8 +212,8 @@ else:
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
 # --- Technical Analysis Section ---
-if "stock" in st.experimental_get_query_params():
-    selected_stock = st.experimental_get_query_params()["stock"][0]
+if "stock" in st.query_params:
+    selected_stock = st.query_params["stock"]
     company_name = stock_dict.get(selected_stock, selected_stock)
     
     st.subheader(f"📈 Technical Analysis: {company_name}")
@@ -382,7 +384,8 @@ if "stock" in st.experimental_get_query_params():
     
     # Add a back button
     if st.button("← Back to Watchlist"):
-        st.experimental_set_query_params()
+        # Clear the query parameter to go back to watchlist
+        st.query_params.clear()
         st.rerun()
 
 # --- Footer ---
