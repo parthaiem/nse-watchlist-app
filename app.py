@@ -84,24 +84,66 @@ def stock_search_component():
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
 st_autorefresh(interval=600000, key="datarefresh")
 
-# User authentication
-if "user" not in st.session_state:
-    username = st.text_input("Enter your name to continue:", key="login_input")
-    if st.button("Login", key="login_btn"):
-        if username:
-            st.session_state.user = username
+# --- Top bar layout ---
+top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
+
+with top_col1:
+    st.image("logo.jpg", width=100)
+
+with top_col2:
+    st.markdown("<h1 style='padding-top: 10px;'>📈 NSE Stock Watchlist</h1>", unsafe_allow_html=True)
+
+with top_col3:
+    if "user" in st.session_state:
+        st.markdown(f"<p style='text-align:right; padding-top: 25px;'>👤 Logged in as <strong>{st.session_state.user}</strong></p>", unsafe_allow_html=True)
+        if st.button("Logout", key="logout_btn"):
+            st.session_state.clear()
             st.rerun()
-        else:
-            st.warning("Please enter a name to login.")
-    st.stop()
-else:
-    # Display logout button
-    if st.button("Logout", key="logout_btn"):
-        st.session_state.clear()
-        st.rerun()
+    else:
+        username = st.text_input("Enter your name to continue:", key="login_input")
+        if st.button("Login", key="login_btn"):
+            if username:
+                st.session_state.user = username
+                st.rerun()
+            else:
+                st.warning("Please enter a name to login.")
+        st.stop()
 
 # --- Market Snapshot Section ---
-# (Same as before)
+index_symbols = {
+    "NIFTY 50": "^NSEI",
+    "SENSEX": "^BSESN",
+    "NASDAQ": "^IXIC",
+    "DOW JONES": "^DJI",
+    "GOLD": "GC=F",
+    "SILVER": "SI=F",
+    "CRUDE OIL": "CL=F"
+}
+
+index_data = []
+for name, symbol in index_symbols.items():
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="1mo")
+        current = hist["Close"][-1]
+        previous = hist["Close"][-2]
+        day_change = ((current - previous) / previous) * 100
+        week_change = ((hist["Close"][-1] - hist["Close"][-5]) / hist["Close"][-5]) * 100 if len(hist) >= 5 else 0
+        month_change = ((hist["Close"][-1] - hist["Close"][0]) / hist["Close"][0]) * 100 if len(hist) > 0 else 0
+        index_data.append({
+            "Index": name,
+            "Current Price": f"{current:.2f}",
+            "Day Change (%)": f"{day_change:+.2f}%",
+            "1-Week Change (%)": f"{week_change:+.2f}%",
+            "1-Month Change (%)": f"{month_change:+.2f}%"
+        })
+    except Exception as e:
+        st.warning(f"Could not load {name}: {e}")
+
+st.subheader("🌐 Global & Commodity Market Snapshot")
+st.dataframe(pd.DataFrame(index_data).style.applymap(color_percent, subset=[
+    "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+]), use_container_width=True)
 
 # --- Stock Watchlist Section ---
 user = st.session_state.user
@@ -206,4 +248,14 @@ else:
         )
 
 # --- Footer ---
-# (Same as before)
+st.markdown("---")
+st.image("https://upload.wikimedia.org/wikipedia/commons/1/1b/Angel_One_Logo.svg", width=100)
+st.markdown(f"""
+    <div style='text-align: center; font-size: 16px; padding-top: 20px;'>
+        <strong>📊 FinSmart Wealth Advisory</strong><br>
+        Partha Chakraborty<br><br>
+        <a href="tel:+91XXXXXXXXXX">📞 Call</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+        <a href="https://wa.me/91XXXXXXXXXX">💬 WhatsApp</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+        <a href="https://angel-one.onelink.me/Wjgr/m8njiek1">📂 Open DMAT</a>
+    </div>
+""", unsafe_allow_html=True)
