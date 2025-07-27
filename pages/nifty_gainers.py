@@ -20,7 +20,51 @@ MARKET_CLOSE_TIME = (15, 30)  # 3:30 PM
 NIFTY_50_STOCKS = {
     'ADANI PORTS': 'ADANIPORTS.NS',
     'ASIAN PAINT': 'ASIANPAINT.NS',
-    # ... [rest of your NIFTY_50_STOCKS dictionary]
+    'AXIS BANK': 'AXISBANK.NS',
+    'BAJAJ AUTO': 'BAJAJ-AUTO.NS',
+    'BAJAJ FINSV': 'BAJAJFINSV.NS',
+    'BAJAJ FINANCE': 'BAJFINANCE.NS',
+    'BHARTI AIRTEL': 'BHARTIARTL.NS',
+    'BPCL': 'BPCL.NS',
+    'BRITANNIA': 'BRITANNIA.NS',
+    'CIPLA': 'CIPLA.NS',
+    'COAL INDIA': 'COALINDIA.NS',
+    'DIVIS LAB': 'DIVISLAB.NS',
+    'DR. REDDYS': 'DRREDDY.NS',
+    'EICHER MOTORS': 'EICHERMOT.NS',
+    'GRASIM': 'GRASIM.NS',
+    'HCL TECH': 'HCLTECH.NS',
+    'HDFC BANK': 'HDFCBANK.NS',
+    'HDFC LIFE': 'HDFCLIFE.NS',
+    'HERO MOTOCORP': 'HEROMOTOCO.NS',
+    'HINDALCO': 'HINDALCO.NS',
+    'HINDUNILVR': 'HINDUNILVR.NS',
+    'ICICI BANK': 'ICICIBANK.NS',
+    'INDUSIND BANK': 'INDUSINDBK.NS',
+    'INFOSYS': 'INFY.NS',
+    'ITC': 'ITC.NS',
+    'JSW STEEL': 'JSWSTEEL.NS',
+    'KOTAK BANK': 'KOTAKBANK.NS',
+    'LT': 'LT.NS',
+    'M&M': 'M&M.NS',
+    'MARUTI': 'MARUTI.NS',
+    'NESTLE': 'NESTLEIND.NS',
+    'NTPC': 'NTPC.NS',
+    'ONGC': 'ONGC.NS',
+    'POWERGRID': 'POWERGRID.NS',
+    'RELIANCE': 'RELIANCE.NS',
+    'SBILIFE': 'SBILIFE.NS',
+    'SBIN': 'SBIN.NS',
+    'SUN PHARMA': 'SUNPHARMA.NS',
+    'TATA CONSUMER': 'TATACONSUM.NS',
+    'TATA MOTORS': 'TATAMOTORS.NS',
+    'TATA STEEL': 'TATASTEEL.NS',
+    'TCS': 'TCS.NS',
+    'TECH MAHINDRA': 'TECHM.NS',
+    'TITAN': 'TITAN.NS',
+    'ULTRATECH CEMENT': 'ULTRACEMCO.NS',
+    'UPL': 'UPL.NS',
+    'WIPRO': 'WIPRO.NS'
 }
 
 # Cache with expiry
@@ -62,13 +106,51 @@ def get_last_trading_day_data(symbol):
     return None
 
 def show_header():
-    # ... [your existing show_header function]
+    # --- Top bar layout ---
+    top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
+
+    with top_col1:
+        st.image("logo.jpg", width=100)
+
+    with top_col2:
+        st.markdown("<h1 style='padding-top: 10px;'>🇮🇳 Nifty 50 Analysis</h1>", unsafe_allow_html=True)
+
+    with top_col3:
+        if "user" in st.session_state:
+            st.markdown(f"<p style='text-align:right; padding-top: 25px;'>👤 Logged in as <strong>{st.session_state.user}</strong></p>", 
+                       unsafe_allow_html=True)
+            if st.button("Logout", key="logout_btn"):
+                st.session_state.clear()
+                st.rerun()
+        else:
+            username = st.text_input("Enter your name to continue:", key="login_input")
+            if st.button("Login", key="login_btn"):
+                if username:
+                    st.session_state.user = username
+                    st.session_state.watchlist = get_watchlist(username)
+                    st.rerun()
+                else:
+                    st.warning("Please enter a name to login.")
+            st.stop()
 
 def show_footer():
-    # ... [your existing show_footer function]
+    st.markdown("---")
+    st.image("https://upload.wikimedia.org/wikipedia/commons/1/1b/Angel_One_Logo.svg", width=100)
+    st.markdown(f"""
+        <div style='text-align: center; font-size: 16px; padding-top: 20px;'>
+            <strong>📊 FinSmart Wealth Advisory</strong><br>
+            Partha Chakraborty<br><br>
+            <a href="tel:+91XXXXXXXXXX">📞 Call</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href="https://wa.me/91XXXXXXXXXX">💬 WhatsApp</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href="https://angel-one.onelink.me/Wjgr/m8njiek1">📂 Open DMAT</a>
+        </div>
+    """, unsafe_allow_html=True)
 
 def color_change(val):
-    # ... [your existing color_change function]
+    if isinstance(val, (int, float)):
+        color = 'green' if val >= 0 else 'red'
+        return f'color: {color}; font-weight: bold;'
+    return ''
 
 def get_stock_performance(symbol, name):
     try:
@@ -141,7 +223,41 @@ def get_nifty50_data():
     return pd.DataFrame(data)
 
 def display_performance(df, title, num=5):
-    # ... [your existing display_performance function]
+    if df.empty:
+        st.warning(f"No data available for {title}")
+        return
+    
+    # Get top gainers and losers
+    gainers = df.nlargest(num, 'Change (%)')
+    losers = df.nsmallest(num, 'Change (%)')
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown(f"## 🏆 {title} Top Gainers")
+        st.dataframe(
+            gainers.style.format({
+                'LTP': '₹{:.2f}',
+                'Change (%)': '{:+.2f}%',
+                '1W Change (%)': '{:+.2f}%',
+                '1M Change (%)': '{:+.2f}%'
+            }).applymap(color_change, subset=['Change (%)', '1W Change (%)', '1M Change (%)']),
+            use_container_width=True,
+            hide_index=True
+        )
+    
+    with col2:
+        st.markdown(f"## 📉 {title} Top Losers")
+        st.dataframe(
+            losers.style.format({
+                'LTP': '₹{:.2f}',
+                'Change (%)': '{:+.2f}%',
+                '1W Change (%)': '{:+.2f}%',
+                '1M Change (%)': '{:+.2f}%'
+            }).applymap(color_change, subset=['Change (%)', '1W Change (%)', '1M Change (%)']),
+            use_container_width=True,
+            hide_index=True
+        )
 
 def main():
     st.set_page_config(page_title="Nifty 50 Analysis", layout="wide")
