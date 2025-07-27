@@ -33,19 +33,21 @@ st.markdown("""
         .stTabs [aria-selected="true"] {
             background-color: #f0f2f6;
         }
+        .stock-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .remove-btn {
+            background-color: #ff4444 !important;
+            color: white !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
 def color_percent(val):
-    """
-    Apply color formatting to percentage values.
-    
-    Args:
-        val (str): Percentage value string (e.g., "+5.25%")
-        
-    Returns:
-        str: CSS color style string
-    """
     try:
         val_float = float(val.strip('%+'))
         color = 'green' if val_float >= 0 else 'red'
@@ -185,9 +187,6 @@ else:
 
                 company = stock_dict.get(symbol, "Unknown")
 
-                # Updated link using st.query_params
-                link = f"<a class='view-charts' href='?stock={symbol}'>View Charts</a>"
-
                 data_rows.append({
                     "Symbol": symbol,
                     "Company": company,
@@ -197,7 +196,6 @@ else:
                     "1-Month Change (%)": f"{month_change:+.2f}%",
                     "52-Week High": f"{high_52:.2f}",
                     "52-Week Low": f"{low_52:.2f}",
-                    "Analysis": link
                 })
             except Exception as e:
                 st.error(f"Error fetching {symbol}: {e}")
@@ -207,6 +205,30 @@ else:
     st.dataframe(df.style.applymap(color_percent, subset=[
         "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
     ]), use_container_width=True)
+
+    # Action buttons for each stock
+    st.subheader("Stock Actions")
+    cols = st.columns(4)  # 4 columns for better mobile responsiveness
+    
+    for i, symbol in enumerate(watchlist):
+        company = stock_dict.get(symbol, symbol)
+        col = cols[i % 4]
+        
+        with col:
+            st.markdown(f"**{company}**")
+            
+            # View Charts button
+            st.markdown(
+                f"<a class='view-charts' href='?stock={symbol}'>📊 View Charts</a>",
+                unsafe_allow_html=True
+            )
+            
+            # Remove button with confirmation
+            if st.button(f"🗑️ Remove {company.split()[0]}", key=f"remove_{symbol}", 
+                        help=f"Remove {company} from watchlist"):
+                remove_from_watchlist(user, symbol)
+                st.success(f"{company} removed from watchlist!")
+                st.rerun()
 
     csv = df.to_csv(index=False)
     st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
@@ -384,7 +406,6 @@ if "stock" in st.query_params:
     
     # Add a back button
     if st.button("← Back to Watchlist"):
-        # Clear the query parameter to go back to watchlist
         st.query_params.clear()
         st.rerun()
 
