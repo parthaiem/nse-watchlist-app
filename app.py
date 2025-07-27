@@ -8,7 +8,7 @@ import plotly.graph_objs as go
 
 # Initialize session state for search results
 if 'search_results' not in st.session_state:
-    st.session_state.search_results = []
+    st.session_state.search_results = {}
 
 def color_percent(val):
     try:
@@ -21,11 +21,10 @@ def color_percent(val):
 def search_nse_stocks(search_term):
     """Search for NSE stocks based on user input"""
     if not search_term:
-        return []
+        return {}
     
     try:
-        # You might want to replace this with actual NSE stock data
-        # For now, we'll use a sample list of popular NSE stocks
+        # This is a sample list of popular NSE stocks - in a real app, you'd query an API
         popular_nse_stocks = {
             "TCS.NS": "TATA CONSULTANCY SERVICES",
             "INFY.NS": "INFOSYS",
@@ -60,8 +59,8 @@ def search_nse_stocks(search_term):
         st.error(f"Error searching stocks: {e}")
         return {}
 
-def stock_search():
-    """Stock search component"""
+def stock_search_component():
+    """Stock search component that returns selected symbol"""
     st.subheader("🔍 Search NSE Stocks")
     
     search_term = st.text_input("Enter company name or symbol", "", key="stock_search_input")
@@ -72,6 +71,7 @@ def stock_search():
         
         if not search_results:
             st.warning("No stocks found matching your search.")
+            return None
         else:
             st.success(f"Found {len(search_results)} matching stocks")
             
@@ -150,19 +150,20 @@ st.dataframe(pd.DataFrame(index_data).style.applymap(color_percent, subset=[
 user = st.session_state.user
 watchlist = get_watchlist(user)
 
-st.subheader("📌 Add to Watchlist")
-selected_symbol = stock_search()
+# Search and add stocks
+selected_symbol = stock_search_component()
 
 if selected_symbol and st.button("➕ Add to Watchlist"):
     if selected_symbol not in watchlist:
         add_to_watchlist(user, selected_symbol)
-        st.success(f"{st.session_state.search_results[selected_symbol]} added!")
+        st.success(f"{st.session_state.search_results[selected_symbol]} added to your watchlist!")
         st.rerun()
 
+# Display watchlist
 st.subheader("📉 Your Watchlist")
 
 if not watchlist:
-    st.info("Your watchlist is empty.")
+    st.info("Your watchlist is empty. Search for stocks above to add them.")
 else:
     data_rows = []
     for symbol in watchlist:
@@ -182,42 +183,47 @@ else:
             low_52 = hist_1y["Low"].min()
 
             # Get company name from search results or use symbol as fallback
-            company = st.session_state.search_results.get(symbol, symbol)
-
-            link = f"[Details](?stock={symbol})"
+            company_name = st.session_state.search_results.get(symbol, symbol)
 
             data_rows.append({
                 "Symbol": symbol,
-                "Company": company,
+                "Company": company_name,
                 "Current Price": round(current_price, 2),
                 "Day Change (%)": f"{day_change:+.2f}%",
                 "1-Week Change (%)": f"{week_change:+.2f}%",
                 "1-Month Change (%)": f"{month_change:+.2f}%",
                 "52-Week High": f"{high_52:.2f}",
                 "52-Week Low": f"{low_52:.2f}",
-                "Details": link
+                "Action": f"❌ Remove"
             })
         except Exception as e:
             st.error(f"Error fetching {symbol}: {e}")
 
-    df = pd.DataFrame(data_rows)
-    st.dataframe(df.style.applymap(color_percent, subset=[
-        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-    ]), use_container_width=True)
-
-    # Add remove button for each stock
-    for symbol in watchlist:
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.write(f"Currently viewing: {st.session_state.search_results.get(symbol, symbol)}")
-        with col2:
-            if st.button(f"Remove {symbol}", key=f"remove_{symbol}"):
-                remove_from_watchlist(user, symbol)
-                st.success(f"Removed {symbol} from watchlist")
+    if data_rows:
+        df = pd.DataFrame(data_rows)
+        
+        # Display styled dataframe
+        styled_df = df.style.applymap(color_percent, subset=[
+            "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+        ])
+        
+        st.dataframe(styled_df, use_container_width=True)
+        
+        # Add remove functionality
+        for index, row in df.iterrows():
+            if st.button(f"Remove {row['Symbol']}", key=f"remove_{row['Symbol']}"):
+                remove_from_watchlist(user, row['Symbol'])
+                st.success(f"Removed {row['Company']} from watchlist")
                 st.rerun()
-
-    csv = df.to_csv(index=False)
-    st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
+        
+        # Export to CSV
+        csv = df.to_csv(index=False)
+        st.download_button(
+            "📥 Export to CSV", 
+            csv, 
+            file_name="watchlist.csv", 
+            mime="text/csv"
+        )
 
 # --- Footer ---
 st.markdown("---")
