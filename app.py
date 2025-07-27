@@ -4,6 +4,21 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
+from supabase import create_client, Client
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize Supabase client
+@st.cache_resource
+def init_supabase():
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+    return create_client(supabase_url, supabase_key)
+
+supabase = init_supabase()
 
 # Custom CSS for styling
 st.markdown("""
@@ -81,6 +96,15 @@ st.markdown("""
             overflow-y: auto;
             margin-top: 10px;
         }
+        /* Login Styles */
+        .login-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-top: 50px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -99,6 +123,23 @@ if 'watchlist' not in st.session_state:
     st.session_state.watchlist = []
 if 'search_results' not in st.session_state:
     st.session_state.search_results = []
+if 'user' not in st.session_state:
+    st.session_state.user = None
+if 'login_form' not in st.session_state:
+    st.session_state.login_form = True
+
+# Database functions
+def add_to_watchlist(user, symbol):
+    data = supabase.table("watchlist").insert({"user": user, "symbol": symbol}).execute()
+    return data
+
+def get_watchlist(user):
+    data = supabase.table("watchlist").select("symbol").eq("user", user).execute()
+    return [item['symbol'] for item in data.data] if data.data else []
+
+def remove_from_watchlist(user, symbol):
+    data = supabase.table("watchlist").delete().eq("user", user).eq("symbol", symbol).execute()
+    return data
 
 # Market indices to display
 market_indices = {
@@ -135,6 +176,60 @@ def get_index_data():
 
 # Page layout
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
+
+# --- Login Section ---
+if not st.session_state.user:
+    with st.container():
+        st.markdown('<div class="login-container">', unsafe_allow_html=True)
+        
+        if st.session_state.login_form:
+            st.subheader("Login")
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Login"):
+                    # In a real app, verify credentials against database
+                    if username and password:
+                        st.session_state.user = username
+                        st.session_state.watchlist = get_watchlist(username)
+                        st.rerun()
+                    else:
+                        st.warning("Please enter both username and password")
+            with col2:
+                if st.button("Register"):
+                    st.session_state.login_form = False
+        else:
+            st.subheader("Register")
+            new_username = st.text_input("New Username")
+            new_password = st.text_input("New Password", type="password")
+            confirm_password = st.text_input("Confirm Password", type="password")
+            
+            if st.button("Create Account"):
+                if new_username and new_password and new_password == confirm_password:
+                    # In a real app, store credentials securely
+                    st.session_state.user = new_username
+                    st.session_state.login_form = True
+                    st.rerun()
+                else:
+                    st.warning("Please fill all fields and ensure passwords match")
+            
+            if st.button("Back to Login"):
+                st.session_state.login_form = True
+                st.rerun()
+                
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()
+
+# --- Logout Button ---
+with st.sidebar:
+    st.markdown(f"Logged in as **{st.session_state.user}**")
+    if st.button("Logout"):
+        st.session_state.user = None
+        st.session_state.watchlist = []
+        st.session_state.selected_stock = None
+        st.rerun()
 
 # --- Market Snapshot ---
 st.subheader("🌐 Global & Commodity Market Snapshot")
@@ -218,7 +313,8 @@ with st.expander("🔍 Search and Add Stocks", expanded=True):
             with col3:
                 if st.button("Add", key=f"add_{result['symbol']}"):
                     if result['symbol'] not in st.session_state.watchlist:
-                        st.session_state.watchlist.append(result['symbol'])
+                        add_to_watchlist(st.session_state.user, result['symbol'])
+                        st.session_state.watchlist = get_watchlist(st.session_state.user)
                         st.success(f"Added {result['name']} to watchlist!")
                         st.rerun()
                     else:
@@ -290,7 +386,8 @@ else:
             with col3:
                 # Remove button
                 if st.button("🗑️ Remove", key=f"remove_{symbol}"):
-                    st.session_state.watchlist.remove(symbol)
+                    remove_from_watchlist(st.session_state.user, symbol)
+                    st.session_state.watchlist = get_watchlist(st.session_state.user)
                     if st.session_state.selected_stock == symbol:
                         st.session_state.selected_stock = None
                     st.rerun()
