@@ -1,112 +1,14 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import numpy as np
-import plotly.graph_objs as go
 from datetime import datetime
-from supabase import create_client, Client
-import os
-from dotenv import load_dotenv
+from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchlist
+from streamlit_autorefresh import st_autorefresh
+import plotly.graph_objs as go
 
-# Load environment variables
-load_dotenv()
-
-# Initialize Supabase client
-@st.cache_resource
-def init_supabase():
-    supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_KEY")
-    return create_client(supabase_url, supabase_key)
-
-supabase = init_supabase()
-
-# Custom CSS for styling
-st.markdown("""
-    <style>
-        /* Market Snapshot Styles */
-        .market-snapshot {
-            display: flex;
-            overflow-x: auto;
-            gap: 15px;
-            padding: 10px 0;
-            margin-bottom: 20px;
-        }
-        .index-card {
-            min-width: 180px;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 12px;
-            text-align: center;
-        }
-        .positive {
-            color: green;
-        }
-        .negative {
-            color: red;
-        }
-        .index-name {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .index-price {
-            font-size: 1.2rem;
-            margin: 5px 0;
-        }
-        .index-change {
-            font-size: 0.9rem;
-        }
-        
-        /* Watchlist Styles */
-        .stock-card {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 12px;
-        }
-        .view-charts-btn {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .remove-btn {
-            background-color: #ff4444;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .ta-container {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-        }
-        .add-stock-section {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .search-results {
-            max-height: 300px;
-            overflow-y: auto;
-            margin-top: 10px;
-        }
-        /* Login Styles */
-        .login-container {
-            max-width: 400px;
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            margin-top: 50px;
-        }
-    </style>
-""", unsafe_allow_html=True)
+# Initialize session state for search results
+if 'search_results' not in st.session_state:
+    st.session_state.search_results = []
 
 def color_percent(val):
     try:
@@ -116,33 +18,100 @@ def color_percent(val):
     except:
         return ''
 
-# Initialize session state
-if 'selected_stock' not in st.session_state:
-    st.session_state.selected_stock = None
-if 'watchlist' not in st.session_state:
-    st.session_state.watchlist = []
-if 'search_results' not in st.session_state:
-    st.session_state.search_results = []
-if 'user' not in st.session_state:
-    st.session_state.user = None
-if 'login_form' not in st.session_state:
-    st.session_state.login_form = True
+def search_nse_stocks(search_term):
+    """Search for NSE stocks based on user input"""
+    if not search_term:
+        return []
+    
+    try:
+        # You might want to replace this with actual NSE stock data
+        # For now, we'll use a sample list of popular NSE stocks
+        popular_nse_stocks = {
+            "TCS.NS": "TATA CONSULTANCY SERVICES",
+            "INFY.NS": "INFOSYS",
+            "WIPRO.NS": "WIPRO",
+            "HCLTECH.NS": "HCL TECHNOLOGIES",
+            "RELIANCE.NS": "RELIANCE INDUSTRIES",
+            "SBIN.NS": "STATE BANK OF INDIA",
+            "ICICIBANK.NS": "ICICI BANK",
+            "TECHM.NS": "TECH MAHINDRA",
+            "HDFCBANK.NS": "HDFC BANK",
+            "BHARTIARTL.NS": "BHARTI AIRTEL",
+            "ITC.NS": "ITC LIMITED",
+            "LT.NS": "LARSEN & TOUBRO",
+            "MARUTI.NS": "MARUTI SUZUKI",
+            "ONGC.NS": "OIL & NATURAL GAS CORP",
+            "SUNPHARMA.NS": "SUN PHARMACEUTICALS",
+            "TATAMOTORS.NS": "TATA MOTORS",
+            "NTPC.NS": "NTPC LIMITED",
+            "POWERGRID.NS": "POWER GRID CORP",
+            "ULTRACEMCO.NS": "ULTRATECH CEMENT",
+            "BAJFINANCE.NS": "BAJAJ FINANCE"
+        }
+        
+        # Filter stocks based on search term (case insensitive)
+        search_term_lower = search_term.lower()
+        results = {k: v for k, v in popular_nse_stocks.items() 
+                  if search_term_lower in v.lower() or search_term_lower in k.lower()}
+        
+        return results
+    
+    except Exception as e:
+        st.error(f"Error searching stocks: {e}")
+        return {}
 
-# Database functions
-def add_to_watchlist(user, symbol):
-    data = supabase.table("watchlist").insert({"user": user, "symbol": symbol}).execute()
-    return data
+def stock_search():
+    """Stock search component"""
+    st.subheader("🔍 Search NSE Stocks")
+    
+    search_term = st.text_input("Enter company name or symbol", "", key="stock_search_input")
+    
+    if search_term:
+        search_results = search_nse_stocks(search_term)
+        st.session_state.search_results = search_results
+        
+        if not search_results:
+            st.warning("No stocks found matching your search.")
+        else:
+            st.success(f"Found {len(search_results)} matching stocks")
+            
+            # Display search results in a dropdown
+            name_to_symbol = {v: k for k, v in search_results.items()}
+            selected_name = st.selectbox("Select a stock", list(name_to_symbol.keys()))
+            
+            return name_to_symbol.get(selected_name)
+    return None
 
-def get_watchlist(user):
-    data = supabase.table("watchlist").select("symbol").eq("user", user).execute()
-    return [item['symbol'] for item in data.data] if data.data else []
+st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
+st_autorefresh(interval=600000, key="datarefresh")
 
-def remove_from_watchlist(user, symbol):
-    data = supabase.table("watchlist").delete().eq("user", user).eq("symbol", symbol).execute()
-    return data
+# --- Top bar layout ---
+top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
 
-# Market indices to display
-market_indices = {
+with top_col1:
+    st.image("logo.jpg", width=100)
+
+with top_col2:
+    st.markdown("<h1 style='padding-top: 10px;'>📈 NSE Stock Watchlist</h1>", unsafe_allow_html=True)
+
+with top_col3:
+    if "user" in st.session_state:
+        st.markdown(f"<p style='text-align:right; padding-top: 25px;'>👤 Logged in as <strong>{st.session_state.user}</strong></p>", unsafe_allow_html=True)
+        if st.button("Logout", key="logout_btn"):
+            st.session_state.clear()
+            st.rerun()
+    else:
+        username = st.text_input("Enter your name to continue:", key="login_input")
+        if st.button("Login", key="login_btn"):
+            if username:
+                st.session_state.user = username
+                st.rerun()
+            else:
+                st.warning("Please enter a name to login.")
+        st.stop()
+
+# --- Market Snapshot Section ---
+index_symbols = {
     "NIFTY 50": "^NSEI",
     "SENSEX": "^BSESN",
     "NASDAQ": "^IXIC",
@@ -152,354 +121,113 @@ market_indices = {
     "CRUDE OIL": "CL=F"
 }
 
-@st.cache_data(ttl=600)  # Cache for 10 minutes
-def get_index_data():
-    index_data = {}
-    for name, symbol in market_indices.items():
-        try:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="1d")
-            
-            if len(hist) > 0:
-                current = hist["Close"][-1]
-                prev_close = hist["Close"][0] if len(hist) > 1 else current
-                change = ((current - prev_close) / prev_close) * 100
-                
-                index_data[name] = {
-                    "price": current,
-                    "change": change,
-                    "symbol": symbol
-                }
-        except Exception as e:
-            st.error(f"Error fetching {name}: {e}")
-    return index_data
+index_data = []
+for name, symbol in index_symbols.items():
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="1mo")
+        current = hist["Close"][-1]
+        previous = hist["Close"][-2]
+        day_change = ((current - previous) / previous) * 100
+        week_change = ((hist["Close"][-1] - hist["Close"][-5]) / hist["Close"][-5]) * 100 if len(hist) >= 5 else 0
+        month_change = ((hist["Close"][-1] - hist["Close"][0]) / hist["Close"][0]) * 100 if len(hist) > 0 else 0
+        index_data.append({
+            "Index": name,
+            "Current Price": f"{current:.2f}",
+            "Day Change (%)": f"{day_change:+.2f}%",
+            "1-Week Change (%)": f"{week_change:+.2f}%",
+            "1-Month Change (%)": f"{month_change:+.2f}%"
+        })
+    except Exception as e:
+        st.warning(f"Could not load {name}: {e}")
 
-# Page layout
-st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
+st.subheader("🌐 Global & Commodity Market Snapshot")
+st.dataframe(pd.DataFrame(index_data).style.applymap(color_percent, subset=[
+    "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+]), use_container_width=True)
 
-# --- Login Section ---
-if not st.session_state.user:
-    with st.container():
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        
-        if st.session_state.login_form:
-            st.subheader("Login")
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Login"):
-                    # In a real app, verify credentials against database
-                    if username and password:
-                        st.session_state.user = username
-                        st.session_state.watchlist = get_watchlist(username)
-                        st.rerun()
-                    else:
-                        st.warning("Please enter both username and password")
-            with col2:
-                if st.button("Register"):
-                    st.session_state.login_form = False
-        else:
-            st.subheader("Register")
-            new_username = st.text_input("New Username")
-            new_password = st.text_input("New Password", type="password")
-            confirm_password = st.text_input("Confirm Password", type="password")
-            
-            if st.button("Create Account"):
-                if new_username and new_password and new_password == confirm_password:
-                    # In a real app, store credentials securely
-                    st.session_state.user = new_username
-                    st.session_state.login_form = True
-                    st.rerun()
-                else:
-                    st.warning("Please fill all fields and ensure passwords match")
-            
-            if st.button("Back to Login"):
-                st.session_state.login_form = True
-                st.rerun()
-                
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()
+# --- Stock Search and Watchlist Management ---
+user = st.session_state.user
+watchlist = get_watchlist(user)
 
-# --- Logout Button ---
-with st.sidebar:
-    st.markdown(f"Logged in as **{st.session_state.user}**")
-    if st.button("Logout"):
-        st.session_state.user = None
-        st.session_state.watchlist = []
-        st.session_state.selected_stock = None
+st.subheader("📌 Add to Watchlist")
+selected_symbol = stock_search()
+
+if selected_symbol and st.button("➕ Add to Watchlist"):
+    if selected_symbol not in watchlist:
+        add_to_watchlist(user, selected_symbol)
+        st.success(f"{st.session_state.search_results[selected_symbol]} added!")
         st.rerun()
 
-# --- Market Snapshot ---
-st.subheader("🌐 Global & Commodity Market Snapshot")
-index_data = get_index_data()
-
-# Create a horizontal scrollable container
-st.markdown('<div class="market-snapshot">', unsafe_allow_html=True)
-
-for name, data in index_data.items():
-    change = data["change"]
-    change_class = "positive" if change >= 0 else "negative"
-    change_arrow = "▲" if change >= 0 else "▼"
-    
-    st.markdown(f"""
-        <div class="index-card">
-            <div class="index-name">{name}</div>
-            <div class="index-price">{data['price']:.2f}</div>
-            <div class="index-change {change_class}">
-                {change_arrow} {abs(change):.2f}%
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# --- Header ---
-st.title("📈 NSE Stock Watchlist")
-
-# --- Stock Search and Add Section ---
-with st.expander("🔍 Search and Add Stocks", expanded=True):
-    search_term = st.text_input("Search NSE stocks by company name or symbol", "")
-    
-    if st.button("Search"):
-        if search_term:
-            try:
-                # Search using yfinance (note: yfinance has limited search capabilities)
-                # For better search, consider using a dedicated stock API
-                ticker = yf.Ticker(f"{search_term.upper()}.NS")
-                info = ticker.info
-                
-                if info.get('symbol', '').endswith('.NS'):
-                    st.session_state.search_results = [{
-                        'symbol': info['symbol'],
-                        'name': info.get('longName', info['symbol']),
-                        'sector': info.get('sector', 'N/A'),
-                        'currentPrice': info.get('currentPrice', 'N/A')
-                    }]
-                else:
-                    # Fallback to Nifty 50 components if specific search fails
-                    nifty50 = yf.Ticker("^NSEI").components
-                    results = []
-                    for symbol in nifty50[:10]:  # Limit to first 10 for performance
-                        try:
-                            ticker = yf.Ticker(f"{symbol}.NS")
-                            info = ticker.info
-                            if (search_term.lower() in info.get('longName', '').lower() or 
-                                search_term.lower() in symbol.lower()):
-                                results.append({
-                                    'symbol': f"{symbol}.NS",
-                                    'name': info.get('longName', symbol),
-                                    'sector': info.get('sector', 'N/A'),
-                                    'currentPrice': info.get('currentPrice', 'N/A')
-                                })
-                        except:
-                            continue
-                    st.session_state.search_results = results
-            except Exception as e:
-                st.error(f"Search error: {e}")
-                st.session_state.search_results = []
-
-    # Display search results
-    if st.session_state.search_results:
-        st.markdown("### Search Results")
-        for result in st.session_state.search_results:
-            col1, col2, col3 = st.columns([4, 2, 1])
-            with col1:
-                st.markdown(f"**{result['name']}** ({result['symbol']})")
-                st.caption(f"Sector: {result['sector']}")
-            with col2:
-                st.markdown(f"Price: {result['currentPrice'] if result['currentPrice'] != 'N/A' else 'N/A'}")
-            with col3:
-                if st.button("Add", key=f"add_{result['symbol']}"):
-                    if result['symbol'] not in st.session_state.watchlist:
-                        add_to_watchlist(st.session_state.user, result['symbol'])
-                        st.session_state.watchlist = get_watchlist(st.session_state.user)
-                        st.success(f"Added {result['name']} to watchlist!")
-                        st.rerun()
-                    else:
-                        st.warning(f"{result['name']} is already in your watchlist")
-
-# --- Watchlist Display ---
 st.subheader("📉 Your Watchlist")
 
-if not st.session_state.watchlist:
-    st.info("Your watchlist is empty. Search and add stocks above.")
+if not watchlist:
+    st.info("Your watchlist is empty.")
 else:
-    # Get data for all watchlist stocks
-    @st.cache_data(ttl=300)
-    def get_watchlist_data(watchlist):
-        data = []
-        for symbol in watchlist:
-            try:
-                stock = yf.Ticker(symbol)
-                hist = stock.history(period="1mo")
-                info = stock.info
-                
-                if len(hist) < 2:
-                    continue
-                    
-                current = hist["Close"][-1]
-                prev_close = hist["Close"][-2]
-                day_change = ((current - prev_close) / prev_close) * 100
-                
-                data.append({
-                    "Symbol": symbol,
-                    "Company": info.get('longName', symbol),
-                    "Price": f"{current:.2f}",
-                    "Change (%)": f"{day_change:+.2f}%",
-                    "Sector": info.get('sector', 'N/A')
-                })
-            except Exception as e:
-                st.error(f"Error fetching {symbol}: {e}")
-        return pd.DataFrame(data)
-    
-    watchlist_df = get_watchlist_data(st.session_state.watchlist)
-    
-    if not watchlist_df.empty:
-        st.dataframe(
-            watchlist_df.style.applymap(color_percent, subset=["Change (%)"]),
-            use_container_width=True
-        )
-    
-    # Display each stock with actions
-    for symbol in st.session_state.watchlist:
+    data_rows = []
+    for symbol in watchlist:
         try:
             stock = yf.Ticker(symbol)
-            info = stock.info
-            company = info.get('longName', symbol)
-            sector = info.get('sector', 'N/A')
-            
-            col1, col2, col3 = st.columns([4, 1, 1])
-            with col1:
-                st.markdown(f"**{company}** ({symbol})")
-                st.caption(f"Sector: {sector}")
-            
-            with col2:
-                # Toggle button for charts
-                if st.button(f"📊 Charts", key=f"view_{symbol}"):
-                    if st.session_state.selected_stock == symbol:
-                        st.session_state.selected_stock = None
-                    else:
-                        st.session_state.selected_stock = symbol
-            
-            with col3:
-                # Remove button
-                if st.button("🗑️ Remove", key=f"remove_{symbol}"):
-                    remove_from_watchlist(st.session_state.user, symbol)
-                    st.session_state.watchlist = get_watchlist(st.session_state.user)
-                    if st.session_state.selected_stock == symbol:
-                        st.session_state.selected_stock = None
-                    st.rerun()
-            
-            # Show technical analysis if this stock is selected
-            if st.session_state.selected_stock == symbol:
-                with st.container():
-                    st.markdown(f"### Technical Analysis: {company}")
-                    
-                    # Get historical data
-                    @st.cache_data(ttl=300)
-                    def get_stock_history(symbol):
-                        stock = yf.Ticker(symbol)
-                        return stock.history(period="1y")
-                    
-                    hist = get_stock_history(symbol)
-                    
-                    # Create tabs for different charts
-                    tab1, tab2, tab3 = st.tabs(["Price Trend", "Moving Averages", "Technical Indicators"])
-                    
-                    with tab1:
-                        # Price chart
-                        fig = go.Figure()
-                        fig.add_trace(go.Candlestick(
-                            x=hist.index,
-                            open=hist['Open'],
-                            high=hist['High'],
-                            low=hist['Low'],
-                            close=hist['Close'],
-                            name='Price'
-                        ))
-                        fig.update_layout(
-                            title=f"{company} Price Trend",
-                            xaxis_rangeslider_visible=False,
-                            height=500
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                    
-                    with tab2:
-                        # Moving averages
-                        hist['MA20'] = hist['Close'].rolling(20).mean()
-                        hist['MA50'] = hist['Close'].rolling(50).mean()
-                        
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            x=hist.index, y=hist['Close'], name='Price'
-                        ))
-                        fig.add_trace(go.Scatter(
-                            x=hist.index, y=hist['MA20'], name='20-day MA'
-                        ))
-                        fig.add_trace(go.Scatter(
-                            x=hist.index, y=hist['MA50'], name='50-day MA'
-                        ))
-                        fig.update_layout(
-                            title="Moving Averages",
-                            height=500
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                    
-                    with tab3:
-                        # Technical indicators
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            # RSI
-                            delta = hist['Close'].diff()
-                            gain = delta.where(delta > 0, 0)
-                            loss = -delta.where(delta < 0, 0)
-                            avg_gain = gain.rolling(14).mean()
-                            avg_loss = loss.rolling(14).mean()
-                            rs = avg_gain / avg_loss
-                            rsi = 100 - (100 / (1 + rs))
-                            
-                            fig = go.Figure()
-                            fig.add_trace(go.Scatter(
-                                x=rsi.index, y=rsi, name='RSI'
-                            ))
-                            fig.add_hline(y=70, line_dash="dash", line_color="red")
-                            fig.add_hline(y=30, line_dash="dash", line_color="green")
-                            fig.update_layout(
-                                title="RSI (14-day)",
-                                height=400
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                        
-                        with col2:
-                            # MACD
-                            exp12 = hist['Close'].ewm(span=12, adjust=False).mean()
-                            exp26 = hist['Close'].ewm(span=26, adjust=False).mean()
-                            macd = exp12 - exp26
-                            signal = macd.ewm(span=9, adjust=False).mean()
-                            
-                            fig = go.Figure()
-                            fig.add_trace(go.Scatter(
-                                x=macd.index, y=macd, name='MACD'
-                            ))
-                            fig.add_trace(go.Scatter(
-                                x=signal.index, y=signal, name='Signal'
-                            ))
-                            fig.update_layout(
-                                title="MACD",
-                                height=400
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
+            hist_1mo = stock.history(period="1mo")
+            hist_1wk = stock.history(period="7d")
+            hist_1y = stock.history(period="1y")
+
+            current_price = hist_1mo["Close"][-1]
+            previous_close = hist_1mo["Close"][-2]
+            day_change = ((current_price - previous_close) / previous_close) * 100
+            week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
+            month_change = ((hist_1mo["Close"][-1] - hist_1mo["Close"][0]) / hist_1mo["Close"][0]) * 100
+
+            high_52 = hist_1y["High"].max()
+            low_52 = hist_1y["Low"].min()
+
+            # Get company name from search results or use symbol as fallback
+            company = st.session_state.search_results.get(symbol, symbol)
+
+            link = f"[Details](?stock={symbol})"
+
+            data_rows.append({
+                "Symbol": symbol,
+                "Company": company,
+                "Current Price": round(current_price, 2),
+                "Day Change (%)": f"{day_change:+.2f}%",
+                "1-Week Change (%)": f"{week_change:+.2f}%",
+                "1-Month Change (%)": f"{month_change:+.2f}%",
+                "52-Week High": f"{high_52:.2f}",
+                "52-Week Low": f"{low_52:.2f}",
+                "Details": link
+            })
         except Exception as e:
-            st.error(f"Error processing {symbol}: {e}")
+            st.error(f"Error fetching {symbol}: {e}")
+
+    df = pd.DataFrame(data_rows)
+    st.dataframe(df.style.applymap(color_percent, subset=[
+        "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
+    ]), use_container_width=True)
+
+    # Add remove button for each stock
+    for symbol in watchlist:
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.write(f"Currently viewing: {st.session_state.search_results.get(symbol, symbol)}")
+        with col2:
+            if st.button(f"Remove {symbol}", key=f"remove_{symbol}"):
+                remove_from_watchlist(user, symbol)
+                st.success(f"Removed {symbol} from watchlist")
+                st.rerun()
+
+    csv = df.to_csv(index=False)
+    st.download_button("📥 Export to CSV", csv, file_name="watchlist.csv", mime="text/csv")
 
 # --- Footer ---
 st.markdown("---")
-st.markdown("""
-    <div style='text-align: center;'>
-        <strong>📊 NSE Stock Watchlist</strong><br>
-        Data provided by Yahoo Finance | Last updated: {date}
+st.image("https://upload.wikimedia.org/wikipedia/commons/1/1b/Angel_One_Logo.svg", width=100)
+st.markdown(f"""
+    <div style='text-align: center; font-size: 16px; padding-top: 20px;'>
+        <strong>📊 FinSmart Wealth Advisory</strong><br>
+        Partha Chakraborty<br><br>
+        <a href="tel:+91XXXXXXXXXX">📞 Call</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+        <a href="https://wa.me/91XXXXXXXXXX">💬 WhatsApp</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+        <a href="https://angel-one.onelink.me/Wjgr/m8njiek1">📂 Open DMAT</a>
     </div>
-""".format(date=datetime.now().strftime("%Y-%m-%d %H:%M")), unsafe_allow_html=True)
+""", unsafe_allow_html=True)
