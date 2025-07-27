@@ -302,7 +302,6 @@ else:
 
             watchlist_data.append({
                 "Company": company_name,
-                "Symbol": symbol,
                 "Price (₹)": current_price,
                 "Day %": day_change,
                 "Week %": week_change,
