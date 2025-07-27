@@ -218,19 +218,67 @@ st.subheader("📉 Your Watchlist")
 if not st.session_state.watchlist:
     st.info("Your watchlist is empty. Search for stocks above to add them.")
 else:
-    # Create table header
-    cols = st.columns([3, 2, 2, 2, 2, 2, 2, 1])
-    headers = ["Company", "Price", "Day %", "Week %", "Month %", "52W High", "52W Low", "Action"]
-    for col, header in zip(cols, headers):
-        col.markdown(f"**{header}**")
+    # Custom CSS for beautiful table
+    st.markdown("""
+    <style>
+        .dataframe {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+            font-size: 0.9em;
+            font-family: sans-serif;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+        }
+        .dataframe thead tr {
+            background-color: #2c3e50;
+            color: #ffffff;
+            text-align: left;
+        }
+        .dataframe th,
+        .dataframe td {
+            padding: 12px 15px;
+        }
+        .dataframe tbody tr {
+            border-bottom: 1px solid #dddddd;
+        }
+        .dataframe tbody tr:nth-of-type(even) {
+            background-color: #f3f3f3;
+        }
+        .dataframe tbody tr:last-of-type {
+            border-bottom: 2px solid #2c3e50;
+        }
+        .dataframe tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+        .positive-change {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .negative-change {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .remove-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        .remove-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
-    # Display each stock in the watchlist
+    # Prepare data for the table
+    watchlist_data = []
     for symbol in st.session_state.watchlist:
         try:
             stock = yf.Ticker(symbol)
             info = stock.info
-            
-            # Get company name
             company_name = info.get('longName', symbol)
             
             # Get price data
@@ -260,69 +308,91 @@ else:
                 high_52 = info.get('fiftyTwoWeekHigh', 0)
                 low_52 = info.get('fiftyTwoWeekLow', 0)
 
-            # Display the row
-            cols = st.columns([3, 2, 2, 2, 2, 2, 2, 1])
-            
-            # Company name
-            cols[0].write(company_name)
-            
-            # Price and changes with color formatting
-            cols[1].write(f"₹{current_price:.2f}")
-            
-            day_color = "green" if day_change >= 0 else "red"
-            cols[2].markdown(f"<span style='color:{day_color}'>{day_change:+.2f}%</span>", unsafe_allow_html=True)
-            
-            week_color = "green" if week_change >= 0 else "red"
-            cols[3].markdown(f"<span style='color:{week_color}'>{week_change:+.2f}%</span>", unsafe_allow_html=True)
-            
-            month_color = "green" if month_change >= 0 else "red"
-            cols[4].markdown(f"<span style='color:{month_color}'>{month_change:+.2f}%</span>", unsafe_allow_html=True)
-            
-            # 52-week high/low
-            cols[5].write(f"₹{high_52:.2f}")
-            cols[6].write(f"₹{low_52:.2f}")
-            
-            # Remove button
-            if cols[7].button("❌", key=f"remove_{symbol}"):
-                remove_from_watchlist(st.session_state.user, symbol)
-                st.session_state.watchlist = get_watchlist(st.session_state.user)
-                st.success(f"Removed {symbol} from watchlist")
-                st.rerun()
-
+            watchlist_data.append({
+                "Company": company_name,
+                "Symbol": symbol,
+                "Price (₹)": f"{current_price:,.2f}",
+                "Day %": f"{day_change:+.2f}%",
+                "Week %": f"{week_change:+.2f}%",
+                "Month %": f"{month_change:+.2f}%",
+                "52W High": f"{high_52:,.2f}",
+                "52W Low": f"{low_52:,.2f}"
+            })
         except Exception as e:
             st.error(f"Error fetching {symbol}: {str(e)}")
 
-    # Export to CSV button
-    if st.button("📥 Export Watchlist to CSV"):
-        data = []
-        for symbol in st.session_state.watchlist:
-            try:
-                stock = yf.Ticker(symbol)
-                info = stock.info
-                company_name = info.get('longName', symbol)
-                
-                hist_1d = stock.history(period="1d")
-                current_price = hist_1d["Close"][-1] if not hist_1d.empty else info.get('currentPrice', 0)
-                
-                data.append({
-                    "Symbol": symbol,
-                    "Company": company_name,
-                    "Current Price": current_price
-                })
-            except:
-                data.append({
-                    "Symbol": symbol,
-                    "Company": "N/A",
-                    "Current Price": "N/A"
-                })
+    if watchlist_data:
+        # Create DataFrame
+        df = pd.DataFrame(watchlist_data)
         
-        df = pd.DataFrame(data)
+        # Style the DataFrame
+        def style_change(val):
+            try:
+                val_float = float(val.strip('%+'))
+                color = 'green' if val_float >= 0 else 'red'
+                return f'color: {color}; font-weight: bold'
+            except:
+                return ''
+        
+        styled_df = df.style.applymap(style_change, subset=["Day %", "Week %", "Month %"])
+        
+        # Display the styled DataFrame
+        st.dataframe(
+            styled_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Company": "Company",
+                "Symbol": "Symbol",
+                "Price (₹)": st.column_config.NumberColumn("Price (₹)", format="₹%.2f"),
+                "Day %": "Day Change",
+                "Week %": "Week Change",
+                "Month %": "Month Change",
+                "52W High": st.column_config.NumberColumn("52W High", format="₹%.2f"),
+                "52W Low": st.column_config.NumberColumn("52W Low", format="₹%.2f")
+            }
+        )
+        
+        # Add remove functionality
+        st.markdown("---")
+        st.subheader("Manage Watchlist")
+        
+        # Create a list to track stocks to remove
+        to_remove = []
+        
+        # Display each stock with a remove button
+        for symbol in st.session_state.watchlist:
+            cols = st.columns([4, 2, 1])
+            company_name = st.session_state.search_results.get(symbol, symbol)
+            
+            # Get current price for display
+            try:
+                current_price = yf.Ticker(symbol).history(period='1d')['Close'][-1]
+                price_display = f"₹{current_price:,.2f}"
+            except:
+                price_display = "Price: N/A"
+            
+            cols[0].markdown(f"**{company_name}**")
+            cols[1].markdown(f"*{price_display}*")
+            
+            if cols[2].button("Remove", key=f"remove_{symbol}"):
+                to_remove.append(symbol)
+        
+        # Process removals
+        for symbol in to_remove:
+            remove_from_watchlist(st.session_state.user, symbol)
+            st.session_state.watchlist = get_watchlist(st.session_state.user)
+            st.success(f"Removed {symbol} from watchlist")
+            st.rerun()
+        
+        # Export to CSV
         csv = df.to_csv(index=False)
         st.download_button(
-            label="Download CSV",
-            data=csv,
-            file_name="watchlist.csv",
-            mime="text/csv"
+            "📥 Export to CSV", 
+            csv, 
+            file_name="watchlist.csv", 
+            mime="text/csv",
+            help="Download your watchlist as a CSV file"
         )
 
 # --- Footer ---
