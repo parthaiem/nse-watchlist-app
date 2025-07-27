@@ -4,6 +4,30 @@ import pandas as pd
 from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchlist
 from streamlit_autorefresh import st_autorefresh
 
+# Predefined list of popular NSE stocks for autocomplete
+POPULAR_NSE_STOCKS = {
+    "RELIANCE.NS": "Reliance Industries",
+    "TCS.NS": "Tata Consultancy Services",
+    "HDFCBANK.NS": "HDFC Bank",
+    "INFY.NS": "Infosys",
+    "ICICIBANK.NS": "ICICI Bank",
+    "ITC.NS": "ITC Limited",
+    "SBIN.NS": "State Bank of India",
+    "BHARTIARTL.NS": "Bharti Airtel",
+    "LT.NS": "Larsen & Toubro",
+    "KOTAKBANK.NS": "Kotak Mahindra Bank",
+    "HCLTECH.NS": "HCL Technologies",
+    "ASIANPAINT.NS": "Asian Paints",
+    "MARUTI.NS": "Maruti Suzuki",
+    "TITAN.NS": "Titan Company",
+    "BAJFINANCE.NS": "Bajaj Finance",
+    "ONGC.NS": "Oil & Natural Gas Corporation",
+    "NTPC.NS": "NTPC Limited",
+    "POWERGRID.NS": "Power Grid Corporation",
+    "ULTRACEMCO.NS": "UltraTech Cement",
+    "WIPRO.NS": "Wipro Limited"
+}
+
 # Initialize session states
 if 'search_results' not in st.session_state:
     st.session_state.search_results = {}
@@ -18,67 +42,85 @@ def color_percent(val):
     except:
         return ''
 
-def search_nse_stocks(search_term):
-    """Search for NSE stocks in real-time using Yahoo Finance"""
-    if not search_term:
+def get_autocomplete_suggestions(search_term):
+    """Get autocomplete suggestions from predefined list"""
+    if not search_term or len(search_term) < 2:
         return {}
     
+    search_term_lower = search_term.lower()
+    return {k: v for k, v in POPULAR_NSE_STOCKS.items() 
+            if search_term_lower in v.lower() or search_term_lower in k.lower()}
+
+def search_nse_stocks(search_term):
+    """Search for NSE stocks using Yahoo Finance with autocomplete"""
+    suggestions = get_autocomplete_suggestions(search_term)
+    
+    # Also try direct Yahoo Finance search
     try:
-        # Use yfinance to search for stocks (append .NS for NSE)
-        search_results = {}
-        
-        # Try searching with .NS suffix first
         ticker = yf.Ticker(f"{search_term.upper()}.NS")
         info = ticker.info
         if 'symbol' in info and info['symbol'].endswith('.NS'):
-            search_results[info['symbol']] = info.get('longName', info['symbol'])
-        
-        # Also try searching without suffix (yfinance might find it)
-        ticker_no_suffix = yf.Ticker(search_term.upper())
-        info_no_suffix = ticker_no_suffix.info
-        if 'symbol' in info_no_suffix and info_no_suffix['symbol'].endswith('.NS'):
-            search_results[info_no_suffix['symbol']] = info_no_suffix.get('longName', info_no_suffix['symbol'])
-        
-        return search_results
+            suggestions[info['symbol']] = info.get('longName', info['symbol'])
+    except:
+        pass
     
-    except Exception as e:
-        st.error(f"Error searching stocks: {str(e)}")
-        return {}
+    return suggestions
 
 def stock_search_component():
-    """Stock search component that returns selected symbol"""
+    """Stock search component with real-time suggestions"""
     st.subheader("🔍 Search NSE Stocks")
     
-    search_term = st.text_input("Enter company name or symbol (e.g., 'RELIANCE' or 'TCS')", 
-                              "", 
-                              key="stock_search_input",
-                              help="Search for stocks listed on NSE. You can use company names or symbols.")
+    # Search input with autocomplete
+    search_term = st.text_input(
+        "Start typing company name or symbol (e.g., 'RELIANCE' or 'TCS')", 
+        "", 
+        key="stock_search_input",
+        help="Search will show suggestions as you type"
+    )
     
-    if search_term:
-        with st.spinner("Searching stocks..."):
-            search_results = search_nse_stocks(search_term)
-            st.session_state.search_results = search_results
-            
-            if not search_results:
-                st.warning("No NSE stocks found matching your search. Try different terms like 'RELIANCE' or 'TCS'")
-                return None
-            else:
-                st.success(f"Found {len(search_results)} matching NSE stocks")
+    # Show autocomplete suggestions
+    if search_term and len(search_term) >= 2:
+        suggestions = get_autocomplete_suggestions(search_term)
+        
+        if suggestions:
+            st.markdown("**Suggestions**")
+            for symbol, name in suggestions.items():
+                if st.button(f"{name} ({symbol})", key=f"suggest_{symbol}"):
+                    st.session_state.selected_stock = symbol
+                    return symbol
+    
+    # Full search when user clicks the button
+    if st.button("Search", key="search_button"):
+        if search_term:
+            with st.spinner("Searching..."):
+                search_results = search_nse_stocks(search_term)
+                st.session_state.search_results = search_results
                 
-                # Display search results in a dropdown
-                name_to_symbol = {v: k for k, v in search_results.items()}
-                selected_name = st.selectbox("Select a stock to add to watchlist", 
-                                          list(name_to_symbol.keys()),
-                                          key="stock_select")
-                
-                # Store selected stock in session state
-                st.session_state.selected_stock = name_to_symbol.get(selected_name)
-                
-                # Add button next to the select box
-                if st.button("➕ Add to Watchlist", key="add_stock"):
-                    if st.session_state.selected_stock:
+                if not search_results:
+                    st.warning("No NSE stocks found matching your search")
+                    return None
+                else:
+                    st.success(f"Found {len(search_results)} matching stocks")
+                    
+                    # Display search results
+                    name_to_symbol = {v: k for k, v in search_results.items()}
+                    selected_name = st.selectbox(
+                        "Select a stock to add to watchlist", 
+                        list(name_to_symbol.keys()),
+                        key="stock_select"
+                    )
+                    
+                    st.session_state.selected_stock = name_to_symbol.get(selected_name)
+                    
+                    if st.button("➕ Add to Watchlist", key="add_stock"):
                         return st.session_state.selected_stock
+        else:
+            st.warning("Please enter a search term")
+    
     return None
+
+# --- Rest of your existing code remains the same ---
+# (Keep all the other functions and main app logic as they were)
 
 # --- Main App ---
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
