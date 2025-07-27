@@ -1,8 +1,8 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
-from supabase_helper import get_watchlist  # Match your existing imports
+from datetime import datetime, timedelta
+from supabase_helper import get_watchlist
 
 # Initialize session states
 if 'watchlist' not in st.session_state:
@@ -10,15 +10,11 @@ if 'watchlist' not in st.session_state:
 
 # Common header function
 def show_header():
-    # --- Top bar layout ---
     top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
-
     with top_col1:
         st.image("logo.jpg", width=100)
-
     with top_col2:
         st.markdown("<h1 style='padding-top: 10px;'>📊 Indian Market Movers</h1>", unsafe_allow_html=True)
-
     with top_col3:
         if "user" in st.session_state:
             st.markdown(f"<p style='text-align:right; padding-top: 25px;'>👤 Logged in as <strong>{st.session_state.user}</strong></p>", 
@@ -52,40 +48,91 @@ def show_footer():
     """, unsafe_allow_html=True)
 
 def color_change(val):
-    """Color formatting for percentage changes"""
     if isinstance(val, (int, float)):
         color = 'green' if val >= 0 else 'red'
         return f'color: {color}; font-weight: bold;'
     return ''
 
+def get_historical_data(symbol, periods):
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period=periods)
+        if not hist.empty:
+            return hist
+    except:
+        return None
+    return None
+
 def get_stock_data(stock_list):
-    """Get stock data for a list of symbols"""
     data = []
+    today = datetime.today()
+    one_month_ago = today - timedelta(days=30)
+    three_months_ago = today - timedelta(days=90)
+    one_year_ago = today - timedelta(days=365)
+    
     for name, symbol in stock_list.items():
         try:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="1d")
-            if not hist.empty:
-                data.append({
-                    'Symbol': name,
-                    'LTP': hist['Close'][-1],
-                    'Change': hist['Close'][-1] - hist['Open'][0],
-                    '% Change': ((hist['Close'][-1] - hist['Open'][0]) / hist['Open'][0]) * 100,
-                    'Volume': hist['Volume'][-1] if 'Volume' in hist.columns else 0
-                })
+            # Get daily data
+            daily_data = yf.Ticker(symbol).history(period="1d")
+            if daily_data.empty:
+                continue
+            
+            # Get historical data for different time periods
+            hist_1m = get_historical_data(symbol, "1mo")
+            hist_3m = get_historical_data(symbol, "3mo")
+            hist_1y = get_historical_data(symbol, "1y")
+            
+            current_price = daily_data['Close'][-1]
+            prev_close = daily_data['Open'][0] if 'Open' in daily_data.columns else daily_data['Close'][0]
+            
+            # Calculate changes
+            day_change = ((current_price - prev_close) / prev_close) * 100 if prev_close != 0 else 0
+            
+            # 1-month change calculation
+            if hist_1m is not None and not hist_1m.empty:
+                month_ago_price = hist_1m['Close'][0]
+                month_change = ((current_price - month_ago_price) / month_ago_price) * 100 if month_ago_price != 0 else 0
+            else:
+                month_change = 0
+                
+            # 3-month change calculation
+            if hist_3m is not None and not hist_3m.empty:
+                three_month_ago_price = hist_3m['Close'][0]
+                three_month_change = ((current_price - three_month_ago_price) / three_month_ago_price) * 100 if three_month_ago_price != 0 else 0
+            else:
+                three_month_change = 0
+                
+            # 52-week high/low
+            if hist_1y is not None and not hist_1y.empty:
+                week52_high = hist_1y['High'].max()
+                week52_low = hist_1y['Low'].min()
+            else:
+                week52_high = current_price
+                week52_low = current_price
+            
+            data.append({
+                'Symbol': name,
+                'LTP': current_price,
+                'Change (%)': day_change,
+                '1M Change (%)': month_change,
+                '3M Change (%)': three_month_change,
+                '52W High': week52_high,
+                '52W Low': week52_low,
+                'Volume': daily_data['Volume'][-1] if 'Volume' in daily_data.columns else 0
+            })
         except Exception as e:
             st.warning(f"Could not load {name}: {str(e)}")
             continue
     return pd.DataFrame(data)
 
-def display_gainers_losers(df, title, num=5):
+def display_gainers_losers(df, title, num=10):
     if df.empty:
         st.warning(f"No data available for {title}")
         return
     
     # Get top gainers and losers
-    gainers = df.nlargest(num, '% Change').reset_index(drop=True)
-    losers = df.nsmallest(num, '% Change').reset_index(drop=True)
+    gainers = df.nlargest(num, 'Change (%)').reset_index(drop=True)
+    losers = df.nsmallest(num, 'Change (%)').reset_index(drop=True)
     
     col1, col2 = st.columns(2)
     
@@ -94,13 +141,16 @@ def display_gainers_losers(df, title, num=5):
         st.dataframe(
             gainers.style.format({
                 'LTP': '₹{:.2f}',
-                'Change': '{:+.2f}',
-                '% Change': '{:+.2f}%',
+                'Change (%)': '{:+.2f}%',
+                '1M Change (%)': '{:+.2f}%',
+                '3M Change (%)': '{:+.2f}%',
+                '52W High': '₹{:.2f}',
+                '52W Low': '₹{:.2f}',
                 'Volume': '{:,}'
-            }).applymap(color_change, subset=['% Change']),
+            }).applymap(color_change, subset=['Change (%)', '1M Change (%)', '3M Change (%)']),
             use_container_width=True,
             hide_index=True,
-            height=min(400, 75 + num * 35)
+            height=min(600, 75 + num * 45)
         )
     
     with col2:
@@ -108,13 +158,16 @@ def display_gainers_losers(df, title, num=5):
         st.dataframe(
             losers.style.format({
                 'LTP': '₹{:.2f}',
-                'Change': '{:+.2f}',
-                '% Change': '{:+.2f}%',
+                'Change (%)': '{:+.2f}%',
+                '1M Change (%)': '{:+.2f}%',
+                '3M Change (%)': '{:+.2f}%',
+                '52W High': '₹{:.2f}',
+                '52W Low': '₹{:.2f}',
                 'Volume': '{:,}'
-            }).applymap(color_change, subset=['% Change']),
+            }).applymap(color_change, subset=['Change (%)', '1M Change (%)', '3M Change (%)']),
             use_container_width=True,
             hide_index=True,
-            height=min(400, 75 + num * 35)
+            height=min(600, 75 + num * 45)
         )
 
 def main():
@@ -124,11 +177,10 @@ def main():
     st.markdown(f"<div style='text-align: right;'>Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>", 
                unsafe_allow_html=True)
     
-    # Refresh button
     if st.button("🔄 Refresh Data", key="refresh_btn"):
         st.rerun()
     
-    # Define stock lists for different indices
+    # Define stock lists
     nifty50_stocks = {
         'RELIANCE': 'RELIANCE.NS',
         'TCS': 'TCS.NS',
@@ -139,12 +191,7 @@ def main():
         'ITC': 'ITC.NS',
         'SBIN': 'SBIN.NS',
         'BHARTIARTL': 'BHARTIARTL.NS',
-        'LT': 'LT.NS',
-        'KOTAKBANK': 'KOTAKBANK.NS',
-        'HCLTECH': 'HCLTECH.NS',
-        'BAJFINANCE': 'BAJFINANCE.NS',
-        'ASIANPAINT': 'ASIANPAINT.NS',
-        'MARUTI': 'MARUTI.NS'
+        'LT': 'LT.NS'
     }
     
     nifty_next50_stocks = {
@@ -170,12 +217,7 @@ def main():
         'ITC': 'ITC.NS',
         'SBIN': 'SBIN.NS',
         'BHARTIARTL': 'BHARTIARTL.NS',
-        'LT': 'LT.NS',
-        'KOTAKBANK': 'KOTAKBANK.NS',
-        'HCLTECH': 'HCLTECH.NS',
-        'BAJFINANCE': 'BAJFINANCE.NS',
-        'ASIANPAINT': 'ASIANPAINT.NS',
-        'MARUTI': 'MARUTI.NS'
+        'LT': 'LT.NS'
     }
     
     large_cap_stocks = {
@@ -204,11 +246,24 @@ def main():
         'AUROPHARMA': 'AUROPHARMA.NS'
     }
     
+    small_cap_stocks = {
+        'IRB': 'IRB.NS',
+        'JBCHEPHARM': 'JBCHEPHARM.NS',
+        'RBLBANK': 'RBLBANK.NS',
+        'CANFINHOME': 'CANFINHOME.NS',
+        'FEDERALBNK': 'FEDERALBNK.NS',
+        'JKCEMENT': 'JKCEMENT.NS',
+        'MANAPPURAM': 'MANAPPURAM.NS',
+        'MFSL': 'MFSL.NS',
+        'SUNDRMFAST': 'SUNDRMFAST.NS',
+        'TV18BRDCST': 'TV18BRDCST.NS'
+    }
+    
     # Nifty 50 Section
     st.markdown("## 🇮🇳 NIFTY 50")
     with st.spinner("Loading Nifty 50 data..."):
         nifty50_data = get_stock_data(nifty50_stocks)
-        display_gainers_losers(nifty50_data, "Nifty 50", num=10)
+        display_gainers_losers(nifty50_data, "Nifty 50")
     
     st.markdown("---")
     
@@ -216,7 +271,7 @@ def main():
     st.markdown("## 🇮🇳 NIFTY NEXT 50")
     with st.spinner("Loading Nifty Next 50 data..."):
         nifty_next50_data = get_stock_data(nifty_next50_stocks)
-        display_gainers_losers(nifty_next50_data, "Nifty Next 50", num=10)
+        display_gainers_losers(nifty_next50_data, "Nifty Next 50")
     
     st.markdown("---")
     
@@ -224,7 +279,7 @@ def main():
     st.markdown("## 🇮🇳 SENSEX")
     with st.spinner("Loading Sensex data..."):
         sensex_data = get_stock_data(sensex_stocks)
-        display_gainers_losers(sensex_data, "Sensex", num=10)
+        display_gainers_losers(sensex_data, "Sensex")
     
     st.markdown("---")
     
@@ -232,7 +287,7 @@ def main():
     st.markdown("## 📊 Large Cap Stocks")
     with st.spinner("Loading Large Cap data..."):
         large_cap_data = get_stock_data(large_cap_stocks)
-        display_gainers_losers(large_cap_data, "Large Cap", num=10)
+        display_gainers_losers(large_cap_data, "Large Cap")
     
     st.markdown("---")
     
@@ -240,7 +295,15 @@ def main():
     st.markdown("## 📊 Mid Cap Stocks")
     with st.spinner("Loading Mid Cap data..."):
         mid_cap_data = get_stock_data(mid_cap_stocks)
-        display_gainers_losers(mid_cap_data, "Mid Cap", num=10)
+        display_gainers_losers(mid_cap_data, "Mid Cap")
+    
+    st.markdown("---")
+    
+    # Small Cap Section
+    st.markdown("## 📊 Small Cap Stocks")
+    with st.spinner("Loading Small Cap data..."):
+        small_cap_data = get_stock_data(small_cap_stocks)
+        display_gainers_losers(small_cap_data, "Small Cap")
     
     show_footer()
 
