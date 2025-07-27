@@ -215,9 +215,6 @@ def main():
             margin: 5px 0;
             background-color: #f9f9f9;
         }
-        .dataframe th, .dataframe td {
-            white-space: nowrap;
-        }
     </style>
     """, unsafe_allow_html=True)
     
@@ -234,7 +231,7 @@ def main():
     
     with tab1:
         st.subheader("🌐 Global Market Indices")
-        global_data = market_data[market_data["Category"] == "Global Indices"].copy()
+        global_data = market_data[market_data["Category"] == "Global Indices"]
         st.dataframe(
             global_data.style.format({
                 "Price": "{:.2f}",
@@ -244,17 +241,16 @@ def main():
             hide_index=True,
             column_config={
                 "Category": None,
-                "Symbol": None,
-                "Name": st.column_config.TextColumn("Index", width="medium"),
-                "Price": st.column_config.NumberColumn("Price", format="₹%.2f"),
-                "Change (%)": st.column_config.TextColumn("Change"),
-                "Last Updated": st.column_config.DatetimeColumn("Updated")
+                "Name": "Index",
+                "Price": "Price",
+                "Change (%)": "Change",
+                "Last Updated": "Updated"
             }
         )
     
     with tab2:
         st.subheader("🛢️ Commodities Market")
-        commodities_data = market_data[market_data["Category"] == "Commodities"].copy()
+        commodities_data = market_data[market_data["Category"] == "Commodities"]
         st.dataframe(
             commodities_data.style.format({
                 "Price": "{:.2f}",
@@ -264,17 +260,16 @@ def main():
             hide_index=True,
             column_config={
                 "Category": None,
-                "Symbol": None,
-                "Name": st.column_config.TextColumn("Commodity", width="medium"),
-                "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
-                "Change (%)": st.column_config.TextColumn("Change"),
-                "Last Updated": st.column_config.DatetimeColumn("Updated")
+                "Name": "Commodity",
+                "Price": "Price",
+                "Change (%)": "Change",
+                "Last Updated": "Updated"
             }
         )
     
     with tab3:
         st.subheader("🇮🇳 Indian Sectoral Indices")
-        sectors_data = market_data[market_data["Category"] == "Indian Sectors"].copy()
+        sectors_data = market_data[market_data["Category"] == "Indian Sectors"]
         st.dataframe(
             sectors_data.style.format({
                 "Price": "{:.2f}",
@@ -284,17 +279,16 @@ def main():
             hide_index=True,
             column_config={
                 "Category": None,
-                "Symbol": None,
-                "Name": st.column_config.TextColumn("Sector", width="medium"),
-                "Price": st.column_config.NumberColumn("Price", format="₹%.2f"),
-                "Change (%)": st.column_config.TextColumn("Change"),
-                "Last Updated": st.column_config.DatetimeColumn("Updated")
+                "Name": "Sector",
+                "Price": "Price",
+                "Change (%)": "Change",
+                "Last Updated": "Updated"
             }
         )
     
     with tab4:
         st.subheader("₿ Cryptocurrencies")
-        crypto_data = market_data[market_data["Category"] == "Cryptocurrencies"].copy()
+        crypto_data = market_data[market_data["Category"] == "Cryptocurrencies"]
         st.dataframe(
             crypto_data.style.format({
                 "Price": "{:.2f}",
@@ -304,11 +298,10 @@ def main():
             hide_index=True,
             column_config={
                 "Category": None,
-                "Symbol": None,
-                "Name": st.column_config.TextColumn("Crypto", width="medium"),
-                "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
-                "Change (%)": st.column_config.TextColumn("Change"),
-                "Last Updated": st.column_config.DatetimeColumn("Updated")
+                "Name": "Crypto",
+                "Price": "Price",
+                "Change (%)": "Change",
+                "Last Updated": "Updated"
             }
         )
     
