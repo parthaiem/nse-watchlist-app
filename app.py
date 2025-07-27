@@ -55,6 +55,96 @@ def color_percent(val):
     except:
         return ''
 
+def display_market_data(indices):
+    """Display market data in a styled table"""
+    data = []
+    for name, symbol in indices.items():
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="1mo")
+            current = hist["Close"][-1]
+            previous = hist["Close"][-2]
+            day_change = ((current - previous) / previous) * 100
+            
+            data.append({
+                "Index": name,
+                "Price": f"{current:.2f}",
+                "Change (%)": f"{day_change:+.2f}%",
+                "Status": "🟢 Up" if day_change >= 0 else "🔴 Down"
+            })
+        except Exception as e:
+            st.warning(f"Could not load {name}: {e}")
+    
+    if data:
+        df = pd.DataFrame(data)
+        st.dataframe(
+            df.style.applymap(color_percent, subset=["Change (%)"]),
+            use_container_width=True,
+            hide_index=True
+        )
+
+def display_watchlist(watchlist, user):
+    """Display watchlist with interactive cards"""
+    for symbol in watchlist:
+        with st.container():
+            st.markdown(f"<div class='stock-card'>", unsafe_allow_html=True)
+            
+            try:
+                stock = yf.Ticker(symbol)
+                info = stock.info
+                hist = stock.history(period="1mo")
+                
+                col1, col2, col3 = st.columns([3, 2, 1])
+                
+                with col1:
+                    st.markdown(f"### {info.get('longName', symbol)}")
+                    st.markdown(f"**{symbol}** | {info.get('sector', 'N/A')}")
+                
+                with col2:
+                    if not hist.empty:
+                        current_price = hist["Close"][-1]
+                        prev_close = hist["Close"][-2] if len(hist) > 1 else current_price
+                        change = ((current_price - prev_close) / prev_close) * 100
+                        
+                        st.metric(
+                            label="Current Price",
+                            value=f"₹{current_price:.2f}",
+                            delta=f"{change:+.2f}%",
+                            delta_color="normal"
+                        )
+                
+                with col3:
+                    if st.button(f"Remove", key=f"remove_{symbol}"):
+                        remove_from_watchlist(user, symbol)
+                        st.success(f"Removed {symbol} from watchlist")
+                        time.sleep(1)
+                        st.rerun()
+                
+                # Additional details in expander
+                with st.expander("View Details"):
+                    tab1, tab2 = st.tabs(["Overview", "Chart"])
+                    
+                    with tab1:
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**52W High:** ₹{info.get('fiftyTwoWeekHigh', 'N/A')}")
+                            st.write(f"**52W Low:** ₹{info.get('fiftyTwoWeekLow', 'N/A')}")
+                            st.write(f"**Volume:** {info.get('volume', 'N/A')}")
+                        
+                        with col2:
+                            st.write(f"**PE Ratio:** {info.get('trailingPE', 'N/A')}")
+                            st.write(f"**Market Cap:** {info.get('marketCap', 'N/A')}")
+                            st.write(f"**Dividend Yield:** {info.get('dividendYield', 'N/A')}")
+                    
+                    with tab2:
+                        if not hist.empty:
+                            st.line_chart(hist["Close"])
+            
+            except Exception as e:
+                st.error(f"Error loading {symbol}: {str(e)}")
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+
 def search_nse_stocks(search_term):
     """Search for NSE stocks in real-time using Yahoo Finance"""
     if not search_term or len(search_term) < 2:
@@ -284,7 +374,7 @@ with st.container():
     if not watchlist:
         st.info("Your watchlist is empty. Search for stocks above to add them.")
     else:
-        display_watchlist(watchlist)
+        display_watchlist(watchlist, user)
 
 # --- Footer ---
 st.markdown("---")
@@ -299,94 +389,3 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
-
-# Helper functions
-def display_market_data(indices):
-    """Display market data in a styled table"""
-    data = []
-    for name, symbol in indices.items():
-        try:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="1mo")
-            current = hist["Close"][-1]
-            previous = hist["Close"][-2]
-            day_change = ((current - previous) / previous) * 100
-            
-            data.append({
-                "Index": name,
-                "Price": f"{current:.2f}",
-                "Change (%)": f"{day_change:+.2f}%",
-                "Status": "🟢 Up" if day_change >= 0 else "🔴 Down"
-            })
-        except Exception as e:
-            st.warning(f"Could not load {name}: {e}")
-    
-    if data:
-        df = pd.DataFrame(data)
-        st.dataframe(
-            df.style.applymap(color_percent, subset=["Change (%)"]),
-            use_container_width=True,
-            hide_index=True
-        )
-
-def display_watchlist(watchlist):
-    """Display watchlist with interactive cards"""
-    for symbol in watchlist:
-        with st.container():
-            st.markdown(f"<div class='stock-card'>", unsafe_allow_html=True)
-            
-            try:
-                stock = yf.Ticker(symbol)
-                info = stock.info
-                hist = stock.history(period="1mo")
-                
-                col1, col2, col3 = st.columns([3, 2, 1])
-                
-                with col1:
-                    st.markdown(f"### {info.get('longName', symbol)}")
-                    st.markdown(f"**{symbol}** | {info.get('sector', 'N/A')}")
-                
-                with col2:
-                    if not hist.empty:
-                        current_price = hist["Close"][-1]
-                        prev_close = hist["Close"][-2] if len(hist) > 1 else current_price
-                        change = ((current_price - prev_close) / prev_close) * 100
-                        
-                        st.metric(
-                            label="Current Price",
-                            value=f"₹{current_price:.2f}",
-                            delta=f"{change:+.2f}%",
-                            delta_color="normal"
-                        )
-                
-                with col3:
-                    if st.button(f"Remove", key=f"remove_{symbol}"):
-                        remove_from_watchlist(user, symbol)
-                        st.success(f"Removed {symbol} from watchlist")
-                        time.sleep(1)
-                        st.rerun()
-                
-                # Additional details in expander
-                with st.expander("View Details"):
-                    tab1, tab2 = st.tabs(["Overview", "Chart"])
-                    
-                    with tab1:
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write(f"**52W High:** ₹{info.get('fiftyTwoWeekHigh', 'N/A')}")
-                            st.write(f"**52W Low:** ₹{info.get('fiftyTwoWeekLow', 'N/A')}")
-                            st.write(f"**Volume:** {info.get('volume', 'N/A')}")
-                        
-                        with col2:
-                            st.write(f"**PE Ratio:** {info.get('trailingPE', 'N/A')}")
-                            st.write(f"**Market Cap:** {info.get('marketCap', 'N/A')}")
-                            st.write(f"**Dividend Yield:** {info.get('dividendYield', 'N/A')}")
-                    
-                    with tab2:
-                        if not hist.empty:
-                            st.line_chart(hist["Close"])
-            
-            except Exception as e:
-                st.error(f"Error loading {symbol}: {str(e)}")
-            
-            st.markdown("</div>", unsafe_allow_html=True)
