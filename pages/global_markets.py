@@ -62,52 +62,52 @@ def color_percent(val):
 
 # Function to get market data
 def get_market_data():
-    # Major Global Indices
+    # Major Global Indices with country flags
     global_indices = {
-        "NIFTY 50": "^NSEI",
-        "SENSEX": "^BSESN",
-        "NIFTY BANK": "^NSEBANK",
-        "NASDAQ": "^IXIC",
-        "S&P 500": "^GSPC",
-        "DOW JONES": "^DJI",
-        "FTSE 100": "^FTSE",
-        "DAX": "^GDAXI",
-        "NIKKEI 225": "^N225",
-        "HANG SENG": "^HSI",
-        "SHANGHAI COMP": "000001.SS"
+        "🇮🇳 NIFTY 50": "^NSEI",
+        "🇮🇳 SENSEX": "^BSESN",
+        "🇮🇳 NIFTY BANK": "^NSEBANK",
+        "🇺🇸 NASDAQ": "^IXIC",
+        "🇺🇸 S&P 500": "^GSPC",
+        "🇺🇸 DOW JONES": "^DJI",
+        "🇬🇧 FTSE 100": "^FTSE",
+        "🇩🇪 DAX": "^GDAXI",
+        "🇯🇵 NIKKEI 225": "^N225",
+        "🇭🇰 HANG SENG": "^HSI",
+        "🇨🇳 SHANGHAI COMP": "000001.SS"
     }
 
     # Commodities
     commodities = {
-        "GOLD": "GC=F",
-        "SILVER": "SI=F",
-        "CRUDE OIL": "CL=F",
-        "BRENT CRUDE": "BZ=F",
-        "NATURAL GAS": "NG=F",
-        "COPPER": "HG=F"
+        "🟡 GOLD": "GC=F",
+        "⚪ SILVER": "SI=F",
+        "🛢️ CRUDE OIL": "CL=F",
+        "🛢️ BRENT CRUDE": "BZ=F",
+        "💨 NATURAL GAS": "NG=F",
+        "🟠 COPPER": "HG=F"
     }
 
     # Indian Sectoral Indices
     indian_sectors = {
-        "NIFTY IT": "^CNXIT",
-        "NIFTY AUTO": "^CNXAUTO",
-        "NIFTY BANK": "^CNXBANK",
-        "NIFTY FIN SERVICE": "^CNXFIN",
-        "NIFTY FMCG": "^CNXFMCG",
-        "NIFTY MEDIA": "^CNXMEDIA",
-        "NIFTY METAL": "^CNXMETAL",
-        "NIFTY PHARMA": "^CNXPHARMA",
-        "NIFTY PSU BANK": "^CNXPSUBANK",
-        "NIFTY REALTY": "^CNXREALTY"
+        "💻 NIFTY IT": "^CNXIT",
+        "🚗 NIFTY AUTO": "^CNXAUTO",
+        "🏦 NIFTY BANK": "^CNXBANK",
+        "💰 NIFTY FIN SERVICE": "^CNXFIN",
+        "🛒 NIFTY FMCG": "^CNXFMCG",
+        "🎬 NIFTY MEDIA": "^CNXMEDIA",
+        "🏗️ NIFTY METAL": "^CNXMETAL",
+        "💊 NIFTY PHARMA": "^CNXPHARMA",
+        "🏛️ NIFTY PSU BANK": "^CNXPSUBANK",
+        "🏢 NIFTY REALTY": "^CNXREALTY"
     }
 
     # Cryptocurrencies
     cryptocurrencies = {
-        "BITCOIN": "BTC-USD",
-        "ETHEREUM": "ETH-USD",
-        "BNB": "BNB-USD",
-        "XRP": "XRP-USD",
-        "SOLANA": "SOL-USD"
+        "₿ BITCOIN": "BTC-USD",
+        "Ξ ETHEREUM": "ETH-USD",
+        "🅱️ BNB": "BNB-USD",
+        "✕ XRP": "XRP-USD",
+        "◎ SOLANA": "SOL-USD"
     }
 
     # Get all data
@@ -215,6 +215,9 @@ def main():
             margin: 5px 0;
             background-color: #f9f9f9;
         }
+        .dataframe th, .dataframe td {
+            white-space: nowrap;
+        }
     </style>
     """, unsafe_allow_html=True)
     
@@ -231,7 +234,7 @@ def main():
     
     with tab1:
         st.subheader("🌐 Global Market Indices")
-        global_data = market_data[market_data["Category"] == "Global Indices"]
+        global_data = market_data[market_data["Category"] == "Global Indices"].copy()
         st.dataframe(
             global_data.style.format({
                 "Price": "{:.2f}",
@@ -241,16 +244,17 @@ def main():
             hide_index=True,
             column_config={
                 "Category": None,
-                "Name": "Index",
-                "Price": "Price",
-                "Change (%)": "Change",
-                "Last Updated": "Updated"
+                "Symbol": None,
+                "Name": st.column_config.TextColumn("Index", width="medium"),
+                "Price": st.column_config.NumberColumn("Price", format="₹%.2f"),
+                "Change (%)": st.column_config.TextColumn("Change"),
+                "Last Updated": st.column_config.DatetimeColumn("Updated")
             }
         )
     
     with tab2:
         st.subheader("🛢️ Commodities Market")
-        commodities_data = market_data[market_data["Category"] == "Commodities"]
+        commodities_data = market_data[market_data["Category"] == "Commodities"].copy()
         st.dataframe(
             commodities_data.style.format({
                 "Price": "{:.2f}",
@@ -260,16 +264,17 @@ def main():
             hide_index=True,
             column_config={
                 "Category": None,
-                "Name": "Commodity",
-                "Price": "Price",
-                "Change (%)": "Change",
-                "Last Updated": "Updated"
+                "Symbol": None,
+                "Name": st.column_config.TextColumn("Commodity", width="medium"),
+                "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
+                "Change (%)": st.column_config.TextColumn("Change"),
+                "Last Updated": st.column_config.DatetimeColumn("Updated")
             }
         )
     
     with tab3:
         st.subheader("🇮🇳 Indian Sectoral Indices")
-        sectors_data = market_data[market_data["Category"] == "Indian Sectors"]
+        sectors_data = market_data[market_data["Category"] == "Indian Sectors"].copy()
         st.dataframe(
             sectors_data.style.format({
                 "Price": "{:.2f}",
@@ -279,16 +284,17 @@ def main():
             hide_index=True,
             column_config={
                 "Category": None,
-                "Name": "Sector",
-                "Price": "Price",
-                "Change (%)": "Change",
-                "Last Updated": "Updated"
+                "Symbol": None,
+                "Name": st.column_config.TextColumn("Sector", width="medium"),
+                "Price": st.column_config.NumberColumn("Price", format="₹%.2f"),
+                "Change (%)": st.column_config.TextColumn("Change"),
+                "Last Updated": st.column_config.DatetimeColumn("Updated")
             }
         )
     
     with tab4:
         st.subheader("₿ Cryptocurrencies")
-        crypto_data = market_data[market_data["Category"] == "Cryptocurrencies"]
+        crypto_data = market_data[market_data["Category"] == "Cryptocurrencies"].copy()
         st.dataframe(
             crypto_data.style.format({
                 "Price": "{:.2f}",
@@ -298,10 +304,11 @@ def main():
             hide_index=True,
             column_config={
                 "Category": None,
-                "Name": "Crypto",
-                "Price": "Price",
-                "Change (%)": "Change",
-                "Last Updated": "Updated"
+                "Symbol": None,
+                "Name": st.column_config.TextColumn("Crypto", width="medium"),
+                "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
+                "Change (%)": st.column_config.TextColumn("Change"),
+                "Last Updated": st.column_config.DatetimeColumn("Updated")
             }
         )
     
