@@ -218,7 +218,13 @@ st.subheader("📉 Your Watchlist")
 if not st.session_state.watchlist:
     st.info("Your watchlist is empty. Search for stocks above to add them.")
 else:
-    data_rows = []
+    # Create table header
+    cols = st.columns([3, 2, 2, 2, 2, 2, 2, 1])
+    headers = ["Company", "Price", "Day %", "Week %", "Month %", "52W High", "52W Low", "Action"]
+    for col, header in zip(cols, headers):
+        col.markdown(f"**{header}**")
+
+    # Display each stock in the watchlist
     for symbol in st.session_state.watchlist:
         try:
             stock = yf.Ticker(symbol)
@@ -254,49 +260,68 @@ else:
                 high_52 = info.get('fiftyTwoWeekHigh', 0)
                 low_52 = info.get('fiftyTwoWeekLow', 0)
 
-            data_rows.append({
-                "Symbol": symbol,
-                "Company": company_name,
-                "Current Price": round(current_price, 2),
-                "Day Change (%)": f"{day_change:+.2f}%",
-                "1-Week Change (%)": f"{week_change:+.2f}%",
-                "1-Month Change (%)": f"{month_change:+.2f}%",
-                "52-Week High": f"{high_52:.2f}",
-                "52-Week Low": f"{low_52:.2f}"
-            })
+            # Display the row
+            cols = st.columns([3, 2, 2, 2, 2, 2, 2, 1])
+            
+            # Company name
+            cols[0].write(company_name)
+            
+            # Price and changes with color formatting
+            cols[1].write(f"₹{current_price:.2f}")
+            
+            day_color = "green" if day_change >= 0 else "red"
+            cols[2].markdown(f"<span style='color:{day_color}'>{day_change:+.2f}%</span>", unsafe_allow_html=True)
+            
+            week_color = "green" if week_change >= 0 else "red"
+            cols[3].markdown(f"<span style='color:{week_color}'>{week_change:+.2f}%</span>", unsafe_allow_html=True)
+            
+            month_color = "green" if month_change >= 0 else "red"
+            cols[4].markdown(f"<span style='color:{month_color}'>{month_change:+.2f}%</span>", unsafe_allow_html=True)
+            
+            # 52-week high/low
+            cols[5].write(f"₹{high_52:.2f}")
+            cols[6].write(f"₹{low_52:.2f}")
+            
+            # Remove button
+            if cols[7].button("❌", key=f"remove_{symbol}"):
+                remove_from_watchlist(st.session_state.user, symbol)
+                st.session_state.watchlist = get_watchlist(st.session_state.user)
+                st.success(f"Removed {symbol} from watchlist")
+                st.rerun()
+
         except Exception as e:
             st.error(f"Error fetching {symbol}: {str(e)}")
 
-    if data_rows:
-        # Display the watchlist table
-        df = pd.DataFrame(data_rows)
-        st.dataframe(
-            df.style.applymap(color_percent, subset=[
-                "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-            ]),
-            use_container_width=True,
-            height=(min(len(df) * 35 + 35, 500))  # Dynamic height
-        )
-        
-        # Add remove buttons for each stock
-        st.subheader("Manage Watchlist")
+    # Export to CSV button
+    if st.button("📥 Export Watchlist to CSV"):
+        data = []
         for symbol in st.session_state.watchlist:
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"{st.session_state.search_results.get(symbol, symbol)}")
-            with col2:
-                if st.button(f"Remove {symbol}", key=f"remove_{symbol}"):
-                    remove_from_watchlist(st.session_state.user, symbol)
-                    st.session_state.watchlist = get_watchlist(st.session_state.user)
-                    st.success(f"Removed {symbol} from watchlist")
-                    st.rerun()
+            try:
+                stock = yf.Ticker(symbol)
+                info = stock.info
+                company_name = info.get('longName', symbol)
+                
+                hist_1d = stock.history(period="1d")
+                current_price = hist_1d["Close"][-1] if not hist_1d.empty else info.get('currentPrice', 0)
+                
+                data.append({
+                    "Symbol": symbol,
+                    "Company": company_name,
+                    "Current Price": current_price
+                })
+            except:
+                data.append({
+                    "Symbol": symbol,
+                    "Company": "N/A",
+                    "Current Price": "N/A"
+                })
         
-        # Export to CSV
+        df = pd.DataFrame(data)
         csv = df.to_csv(index=False)
         st.download_button(
-            "📥 Export to CSV", 
-            csv, 
-            file_name="watchlist.csv", 
+            label="Download CSV",
+            data=csv,
+            file_name="watchlist.csv",
             mime="text/csv"
         )
 
