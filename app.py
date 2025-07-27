@@ -33,6 +33,8 @@ if 'search_results' not in st.session_state:
     st.session_state.search_results = {}
 if 'selected_stock' not in st.session_state:
     st.session_state.selected_stock = None
+if 'watchlist' not in st.session_state:
+    st.session_state.watchlist = []
 
 def color_percent(val):
     try:
@@ -84,13 +86,19 @@ def stock_search_component():
         
         if suggestions:
             st.markdown("**Suggestions**")
+            cols = st.columns(3)  # Create 3 columns for suggestions
+            col_index = 0
+            
             for symbol, name in suggestions.items():
-                if st.button(f"{name} ({symbol})", key=f"suggest_{symbol}"):
-                    st.session_state.selected_stock = symbol
-                    return symbol
+                with cols[col_index]:
+                    if st.button(f"{name} ({symbol})", key=f"suggest_{symbol}"):
+                        st.session_state.selected_stock = symbol
+                        st.session_state.search_results = {symbol: name}
+                        st.rerun()
+                col_index = (col_index + 1) % 3
     
     # Full search when user clicks the button
-    if st.button("Search", key="search_button"):
+    if st.button("🔍 Search Stocks", key="search_button"):
         if search_term:
             with st.spinner("Searching..."):
                 search_results = search_nse_stocks(search_term)
@@ -98,29 +106,41 @@ def stock_search_component():
                 
                 if not search_results:
                     st.warning("No NSE stocks found matching your search")
-                    return None
                 else:
                     st.success(f"Found {len(search_results)} matching stocks")
-                    
-                    # Display search results
-                    name_to_symbol = {v: k for k, v in search_results.items()}
-                    selected_name = st.selectbox(
-                        "Select a stock to add to watchlist", 
-                        list(name_to_symbol.keys()),
-                        key="stock_select"
-                    )
-                    
-                    st.session_state.selected_stock = name_to_symbol.get(selected_name)
-                    
-                    if st.button("➕ Add to Watchlist", key="add_stock"):
-                        return st.session_state.selected_stock
         else:
             st.warning("Please enter a search term")
     
+    # Display search results if available
+    if st.session_state.search_results:
+        st.markdown("---")
+        st.markdown("### Search Results")
+        
+        for symbol, name in st.session_state.search_results.items():
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.markdown(f"**{name}**")
+                st.markdown(f"*{symbol}*")
+                
+                try:
+                    stock = yf.Ticker(symbol)
+                    info = stock.info
+                    st.write(f"**Current Price:** ₹{info.get('currentPrice', 'N/A')}")
+                    st.write(f"**Sector:** {info.get('sector', 'N/A')}")
+                except:
+                    st.warning("Couldn't fetch price data")
+            
+            with col2:
+                if st.button(f"➕ Add", key=f"add_{symbol}"):
+                    if symbol not in st.session_state.watchlist:
+                        add_to_watchlist(st.session_state.user, symbol)
+                        st.session_state.watchlist = get_watchlist(st.session_state.user)
+                        st.success(f"Added {name} to watchlist!")
+                        st.rerun()
+                    else:
+                        st.warning("Already in watchlist")
+    
     return None
-
-# --- Rest of your existing code remains the same ---
-# (Keep all the other functions and main app logic as they were)
 
 # --- Main App ---
 st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
@@ -146,6 +166,7 @@ with top_col3:
         if st.button("Login", key="login_btn"):
             if username:
                 st.session_state.user = username
+                st.session_state.watchlist = get_watchlist(username)
                 st.rerun()
             else:
                 st.warning("Please enter a name to login.")
@@ -188,28 +209,13 @@ st.dataframe(pd.DataFrame(index_data).style.applymap(color_percent, subset=[
 ]), use_container_width=True)
 
 # --- Stock Watchlist Section ---
-user = st.session_state.user
-watchlist = get_watchlist(user)
-
-# Search and add stocks
-selected_symbol = stock_search_component()
-
-if selected_symbol:
-    if selected_symbol not in watchlist:
-        add_to_watchlist(user, selected_symbol)
-        st.success(f"{st.session_state.search_results[selected_symbol]} added to watchlist!")
-        st.rerun()
-    else:
-        st.warning("This stock is already in your watchlist!")
-
-# Display watchlist
 st.subheader("📉 Your Watchlist")
 
-if not watchlist:
+if not st.session_state.watchlist:
     st.info("Your watchlist is empty. Search for stocks above to add them.")
 else:
     data_rows = []
-    for symbol in watchlist:
+    for symbol in st.session_state.watchlist:
         try:
             stock = yf.Ticker(symbol)
             info = stock.info
@@ -270,13 +276,14 @@ else:
         
         # Add remove buttons for each stock
         st.subheader("Manage Watchlist")
-        for symbol in watchlist:
+        for symbol in st.session_state.watchlist:
             col1, col2 = st.columns([3, 1])
             with col1:
                 st.write(f"{st.session_state.search_results.get(symbol, symbol)}")
             with col2:
                 if st.button(f"Remove {symbol}", key=f"remove_{symbol}"):
-                    remove_from_watchlist(user, symbol)
+                    remove_from_watchlist(st.session_state.user, symbol)
+                    st.session_state.watchlist = get_watchlist(st.session_state.user)
                     st.success(f"Removed {symbol} from watchlist")
                     st.rerun()
         
