@@ -3,12 +3,49 @@ import yfinance as yf
 import pandas as pd
 from supabase_helper import add_to_watchlist, get_watchlist, remove_from_watchlist
 from streamlit_autorefresh import st_autorefresh
+import time
 
 # Initialize session states
 if 'search_results' not in st.session_state:
     st.session_state.search_results = {}
 if 'selected_stock' not in st.session_state:
     st.session_state.selected_stock = None
+
+# Custom CSS for better UI
+st.markdown("""
+<style>
+    .stTextInput input {
+        border-radius: 8px;
+        padding: 12px;
+    }
+    .stButton button {
+        border-radius: 8px;
+        padding: 8px 16px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+    }
+    .stButton button:hover {
+        background-color: #45a049;
+    }
+    .stock-card {
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .positive {
+        color: #2ecc71;
+    }
+    .negative {
+        color: #e74c3c;
+    }
+    .header {
+        color: #3498db;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 def color_percent(val):
     try:
@@ -20,86 +57,159 @@ def color_percent(val):
 
 def search_nse_stocks(search_term):
     """Search for NSE stocks in real-time using Yahoo Finance"""
-    if not search_term:
+    if not search_term or len(search_term) < 2:
         return {}
     
     try:
-        # Use yfinance to search for stocks (append .NS for NSE)
-        search_results = {}
+        # Predefined list of popular NSE stocks for autocomplete
+        popular_nse_stocks = {
+            "RELIANCE.NS": "Reliance Industries",
+            "TCS.NS": "Tata Consultancy Services",
+            "HDFCBANK.NS": "HDFC Bank",
+            "INFY.NS": "Infosys",
+            "HINDUNILVR.NS": "Hindustan Unilever",
+            "ICICIBANK.NS": "ICICI Bank",
+            "ITC.NS": "ITC Limited",
+            "SBIN.NS": "State Bank of India",
+            "BHARTIARTL.NS": "Bharti Airtel",
+            "LT.NS": "Larsen & Toubro",
+            "KOTAKBANK.NS": "Kotak Mahindra Bank",
+            "HCLTECH.NS": "HCL Technologies",
+            "ASIANPAINT.NS": "Asian Paints",
+            "MARUTI.NS": "Maruti Suzuki",
+            "TITAN.NS": "Titan Company",
+            "BAJFINANCE.NS": "Bajaj Finance",
+            "ONGC.NS": "Oil & Natural Gas Corporation",
+            "NTPC.NS": "NTPC Limited",
+            "POWERGRID.NS": "Power Grid Corporation",
+            "ULTRACEMCO.NS": "UltraTech Cement"
+        }
         
-        # Try searching with .NS suffix first
-        ticker = yf.Ticker(f"{search_term.upper()}.NS")
-        info = ticker.info
-        if 'symbol' in info and info['symbol'].endswith('.NS'):
-            search_results[info['symbol']] = info.get('longName', info['symbol'])
+        # Filter for autocomplete suggestions
+        search_term_lower = search_term.lower()
+        suggestions = {k: v for k, v in popular_nse_stocks.items() 
+                      if search_term_lower in v.lower() or search_term_lower in k.lower()}
         
-        # Also try searching without suffix (yfinance might find it)
-        ticker_no_suffix = yf.Ticker(search_term.upper())
-        info_no_suffix = ticker_no_suffix.info
-        if 'symbol' in info_no_suffix and info_no_suffix['symbol'].endswith('.NS'):
-            search_results[info_no_suffix['symbol']] = info_no_suffix.get('longName', info_no_suffix['symbol'])
-        
-        return search_results
+        # Also try direct Yahoo Finance search
+        try:
+            ticker = yf.Ticker(f"{search_term.upper()}.NS")
+            info = ticker.info
+            if 'symbol' in info and info['symbol'].endswith('.NS'):
+                suggestions[info['symbol']] = info.get('longName', info['symbol'])
+        except:
+            pass
+            
+        return suggestions
     
     except Exception as e:
         st.error(f"Error searching stocks: {str(e)}")
         return {}
 
 def stock_search_component():
-    """Stock search component that returns selected symbol"""
-    st.subheader("🔍 Search NSE Stocks")
-    
-    search_term = st.text_input("Enter company name or symbol (e.g., 'RELIANCE' or 'TCS')", 
-                              "", 
-                              key="stock_search_input",
-                              help="Search for stocks listed on NSE. You can use company names or symbols.")
-    
-    if search_term:
-        with st.spinner("Searching stocks..."):
-            search_results = search_nse_stocks(search_term)
-            st.session_state.search_results = search_results
-            
-            if not search_results:
-                st.warning("No NSE stocks found matching your search. Try different terms like 'RELIANCE' or 'TCS'")
-                return None
-            else:
-                st.success(f"Found {len(search_results)} matching NSE stocks")
+    """Stock search component with autocomplete"""
+    with st.container():
+        st.subheader("🔍 Search NSE Stocks", anchor=False)
+        
+        # Create two columns for search input and button
+        col1, col2 = st.columns([4, 1])
+        
+        with col1:
+            search_term = st.text_input(
+                "Start typing company name or symbol (e.g., 'Reliance' or 'TCS')", 
+                "", 
+                key="stock_search_input",
+                help="Search will autocomplete as you type",
+                placeholder="Search for NSE stocks..."
+            )
+        
+        with col2:
+            st.write("")  # Spacer
+            st.write("")  # Spacer
+            search_clicked = st.button("Search", key="search_button")
+        
+        # Display autocomplete suggestions as user types
+        if search_term and len(search_term) >= 2:
+            with st.spinner("Searching..."):
+                suggestions = search_nse_stocks(search_term)
                 
-                # Display search results in a dropdown
-                name_to_symbol = {v: k for k, v in search_results.items()}
-                selected_name = st.selectbox("Select a stock to add to watchlist", 
-                                          list(name_to_symbol.keys()),
-                                          key="stock_select")
+                if suggestions:
+                    st.markdown("#### Suggestions")
+                    for symbol, name in suggestions.items():
+                        with st.expander(f"{name} ({symbol})"):
+                            try:
+                                stock = yf.Ticker(symbol)
+                                info = stock.info
+                                
+                                col1, col2 = st.columns([2, 1])
+                                with col1:
+                                    st.write(f"**Sector:** {info.get('sector', 'N/A')}")
+                                    st.write(f"**Current Price:** ₹{info.get('currentPrice', 'N/A')}")
+                                    st.write(f"**52W Range:** ₹{info.get('fiftyTwoWeekLow', 'N/A')} - ₹{info.get('fiftyTwoWeekHigh', 'N/A')}")
+                                
+                                with col2:
+                                    if st.button(f"Add {symbol}", key=f"add_{symbol}"):
+                                        return symbol
+                            except:
+                                st.warning("Couldn't fetch details for this stock")
+        
+        # Handle search button click
+        if search_clicked and search_term:
+            with st.spinner("Searching stocks..."):
+                search_results = search_nse_stocks(search_term)
+                st.session_state.search_results = search_results
                 
-                # Store selected stock in session state
-                st.session_state.selected_stock = name_to_symbol.get(selected_name)
-                
-                # Add button next to the select box
-                if st.button("➕ Add to Watchlist", key="add_stock"):
-                    if st.session_state.selected_stock:
-                        return st.session_state.selected_stock
+                if not search_results:
+                    st.warning("No NSE stocks found matching your search. Try different terms like 'Reliance' or 'TCS'")
+                    return None
+                else:
+                    st.success(f"Found {len(search_results)} matching NSE stocks")
+                    
+                    # Display search results
+                    st.markdown("#### Search Results")
+                    for symbol, name in search_results.items():
+                        with st.container():
+                            st.markdown(f"<div class='stock-card'>", unsafe_allow_html=True)
+                            
+                            col1, col2 = st.columns([4, 1])
+                            with col1:
+                                st.markdown(f"**{name}**")
+                                st.markdown(f"*{symbol}*")
+                                
+                                try:
+                                    stock = yf.Ticker(symbol)
+                                    info = stock.info
+                                    st.write(f"Current: ₹{info.get('currentPrice', 'N/A')} | "
+                                            f"52W High: ₹{info.get('fiftyTwoWeekHigh', 'N/A')} | "
+                                            f"52W Low: ₹{info.get('fiftyTwoWeekLow', 'N/A')}")
+                                except:
+                                    st.warning("Couldn't fetch price data")
+                            
+                            with col2:
+                                if st.button(f"Add", key=f"add_{symbol}"):
+                                    return symbol
+                            
+                            st.markdown("</div>", unsafe_allow_html=True)
     return None
 
 # --- Main App ---
-st.set_page_config(page_title="NSE Stock Watchlist", layout="wide")
+st.set_page_config(
+    page_title="NSE Stock Watchlist", 
+    layout="wide",
+    page_icon="📈"
+)
+
+# Auto-refresh every 10 minutes
 st_autorefresh(interval=600000, key="datarefresh")
 
 # --- Top bar layout ---
-top_col1, top_col2, top_col3 = st.columns([1, 4, 2])
+st.markdown("<div style='background-color:#3498db;padding:10px;border-radius:10px;margin-bottom:20px;'>"
+            "<h1 style='color:white;text-align:center;'>📈 NSE Stock Watchlist</h1>"
+            "</div>", unsafe_allow_html=True)
 
-with top_col1:
-    st.image("logo.jpg", width=100)
-
-with top_col2:
-    st.markdown("<h1 style='padding-top: 10px;'>📈 NSE Stock Watchlist</h1>", unsafe_allow_html=True)
-
-with top_col3:
-    if "user" in st.session_state:
-        st.markdown(f"<p style='text-align:right; padding-top: 25px;'>👤 Logged in as <strong>{st.session_state.user}</strong></p>", unsafe_allow_html=True)
-        if st.button("Logout", key="logout_btn"):
-            st.session_state.clear()
-            st.rerun()
-    else:
+# User authentication
+if "user" not in st.session_state:
+    with st.container():
+        st.subheader("Login", anchor=False)
         username = st.text_input("Enter your name to continue:", key="login_input")
         if st.button("Login", key="login_btn"):
             if username:
@@ -107,43 +217,49 @@ with top_col3:
                 st.rerun()
             else:
                 st.warning("Please enter a name to login.")
-        st.stop()
+    st.stop()
+else:
+    # Display user info and logout button
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        st.markdown(f"<p style='font-size:18px;'>👤 Logged in as <strong>{st.session_state.user}</strong></p>", 
+                   unsafe_allow_html=True)
+    with col2:
+        if st.button("Logout", key="logout_btn"):
+            st.session_state.clear()
+            st.rerun()
 
 # --- Market Snapshot Section ---
-index_symbols = {
-    "NIFTY 50": "^NSEI",
-    "SENSEX": "^BSESN",
-    "NASDAQ": "^IXIC",
-    "DOW JONES": "^DJI",
-    "GOLD": "GC=F",
-    "SILVER": "SI=F",
-    "CRUDE OIL": "CL=F"
-}
-
-index_data = []
-for name, symbol in index_symbols.items():
-    try:
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="1mo")
-        current = hist["Close"][-1]
-        previous = hist["Close"][-2]
-        day_change = ((current - previous) / previous) * 100
-        week_change = ((hist["Close"][-1] - hist["Close"][-5]) / hist["Close"][-5]) * 100 if len(hist) >= 5 else 0
-        month_change = ((hist["Close"][-1] - hist["Close"][0]) / hist["Close"][0]) * 100 if len(hist) > 0 else 0
-        index_data.append({
-            "Index": name,
-            "Current Price": f"{current:.2f}",
-            "Day Change (%)": f"{day_change:+.2f}%",
-            "1-Week Change (%)": f"{week_change:+.2f}%",
-            "1-Month Change (%)": f"{month_change:+.2f}%"
-        })
-    except Exception as e:
-        st.warning(f"Could not load {name}: {e}")
-
-st.subheader("🌐 Global & Commodity Market Snapshot")
-st.dataframe(pd.DataFrame(index_data).style.applymap(color_percent, subset=[
-    "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-]), use_container_width=True)
+with st.container():
+    st.subheader("🌐 Global & Commodity Market Snapshot", anchor=False)
+    
+    index_symbols = {
+        "NIFTY 50": "^NSEI",
+        "SENSEX": "^BSESN",
+        "NASDAQ": "^IXIC",
+        "DOW JONES": "^DJI",
+        "GOLD": "GC=F",
+        "SILVER": "SI=F",
+        "CRUDE OIL": "CL=F"
+    }
+    
+    # Create tabs for different market segments
+    tab1, tab2, tab3 = st.tabs(["Indian Indices", "US Indices", "Commodities"])
+    
+    with tab1:
+        st.markdown("#### Indian Market Indices")
+        indian_indices = {k: v for k, v in index_symbols.items() if k in ["NIFTY 50", "SENSEX"]}
+        display_market_data(indian_indices)
+    
+    with tab2:
+        st.markdown("#### US Market Indices")
+        us_indices = {k: v for k, v in index_symbols.items() if k in ["NASDAQ", "DOW JONES"]}
+        display_market_data(us_indices)
+    
+    with tab3:
+        st.markdown("#### Commodities")
+        commodities = {k: v for k, v in index_symbols.items() if k in ["GOLD", "SILVER", "CRUDE OIL"]}
+        display_market_data(commodities)
 
 # --- Stock Watchlist Section ---
 user = st.session_state.user
@@ -155,107 +271,122 @@ selected_symbol = stock_search_component()
 if selected_symbol:
     if selected_symbol not in watchlist:
         add_to_watchlist(user, selected_symbol)
-        st.success(f"{st.session_state.search_results[selected_symbol]} added to watchlist!")
+        st.success(f"{st.session_state.search_results.get(selected_symbol, selected_symbol)} added to watchlist!")
+        time.sleep(1)
         st.rerun()
     else:
         st.warning("This stock is already in your watchlist!")
 
 # Display watchlist
-st.subheader("📉 Your Watchlist")
-
-if not watchlist:
-    st.info("Your watchlist is empty. Search for stocks above to add them.")
-else:
-    data_rows = []
-    for symbol in watchlist:
-        try:
-            stock = yf.Ticker(symbol)
-            info = stock.info
-            
-            # Get company name
-            company_name = info.get('longName', symbol)
-            
-            # Get price data
-            hist_1d = stock.history(period="1d")
-            hist_1wk = stock.history(period="7d")
-            hist_1y = stock.history(period="1y")
-
-            if not hist_1d.empty:
-                current_price = hist_1d["Close"][-1]
-                previous_close = hist_1d["Open"][0] if len(hist_1d) > 0 else current_price
-                day_change = ((current_price - previous_close) / previous_close) * 100
-            else:
-                current_price = info.get('currentPrice', 0)
-                day_change = 0
-
-            if not hist_1wk.empty:
-                week_change = ((hist_1wk["Close"][-1] - hist_1wk["Close"][0]) / hist_1wk["Close"][0]) * 100
-            else:
-                week_change = 0
-
-            if not hist_1y.empty:
-                month_change = ((hist_1y["Close"][-1] - hist_1y["Close"][0]) / hist_1y["Close"][0]) * 100
-                high_52 = hist_1y["High"].max()
-                low_52 = hist_1y["Low"].min()
-            else:
-                month_change = 0
-                high_52 = info.get('fiftyTwoWeekHigh', 0)
-                low_52 = info.get('fiftyTwoWeekLow', 0)
-
-            data_rows.append({
-                "Symbol": symbol,
-                "Company": company_name,
-                "Current Price": round(current_price, 2),
-                "Day Change (%)": f"{day_change:+.2f}%",
-                "1-Week Change (%)": f"{week_change:+.2f}%",
-                "1-Month Change (%)": f"{month_change:+.2f}%",
-                "52-Week High": f"{high_52:.2f}",
-                "52-Week Low": f"{low_52:.2f}"
-            })
-        except Exception as e:
-            st.error(f"Error fetching {symbol}: {str(e)}")
-
-    if data_rows:
-        # Display the watchlist table
-        df = pd.DataFrame(data_rows)
-        st.dataframe(
-            df.style.applymap(color_percent, subset=[
-                "Day Change (%)", "1-Week Change (%)", "1-Month Change (%)"
-            ]),
-            use_container_width=True,
-            height=(min(len(df) * 35 + 35, 500))  # Dynamic height
-        )
-        
-        # Add remove buttons for each stock
-        st.subheader("Manage Watchlist")
-        for symbol in watchlist:
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"{st.session_state.search_results.get(symbol, symbol)}")
-            with col2:
-                if st.button(f"Remove {symbol}", key=f"remove_{symbol}"):
-                    remove_from_watchlist(user, symbol)
-                    st.success(f"Removed {symbol} from watchlist")
-                    st.rerun()
-        
-        # Export to CSV
-        csv = df.to_csv(index=False)
-        st.download_button(
-            "📥 Export to CSV", 
-            csv, 
-            file_name="watchlist.csv", 
-            mime="text/csv"
-        )
+with st.container():
+    st.subheader("📉 Your Watchlist", anchor=False)
+    
+    if not watchlist:
+        st.info("Your watchlist is empty. Search for stocks above to add them.")
+    else:
+        display_watchlist(watchlist)
 
 # --- Footer ---
 st.markdown("---")
-st.image("https://upload.wikimedia.org/wikipedia/commons/1/1b/Angel_One_Logo.svg", width=100)
-st.markdown(f"""
-    <div style='text-align: center; font-size: 16px; padding-top: 20px;'>
-        <strong>📊 FinSmart Wealth Advisory</strong><br>
-        Partha Chakraborty<br><br>
-        <a href="tel:+91XXXXXXXXXX">📞 Call</a> &nbsp;&nbsp;|&nbsp;&nbsp;
-        <a href="https://wa.me/91XXXXXXXXXX">💬 WhatsApp</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+st.markdown("""
+<div style='text-align: center; padding: 20px; background-color: #f9f9f9; border-radius: 10px;'>
+    <h4>📊 FinSmart Wealth Advisory</h4>
+    <p>Partha Chakraborty</p>
+    <div style='display: flex; justify-content: center; gap: 20px;'>
+        <a href="tel:+91XXXXXXXXXX">📞 Call</a>
+        <a href="https://wa.me/91XXXXXXXXXX">💬 WhatsApp</a>
         <a href="https://angel-one.onelink.me/Wjgr/m8njiek1">📂 Open DMAT</a>
     </div>
+</div>
 """, unsafe_allow_html=True)
+
+# Helper functions
+def display_market_data(indices):
+    """Display market data in a styled table"""
+    data = []
+    for name, symbol in indices.items():
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="1mo")
+            current = hist["Close"][-1]
+            previous = hist["Close"][-2]
+            day_change = ((current - previous) / previous) * 100
+            
+            data.append({
+                "Index": name,
+                "Price": f"{current:.2f}",
+                "Change (%)": f"{day_change:+.2f}%",
+                "Status": "🟢 Up" if day_change >= 0 else "🔴 Down"
+            })
+        except Exception as e:
+            st.warning(f"Could not load {name}: {e}")
+    
+    if data:
+        df = pd.DataFrame(data)
+        st.dataframe(
+            df.style.applymap(color_percent, subset=["Change (%)"]),
+            use_container_width=True,
+            hide_index=True
+        )
+
+def display_watchlist(watchlist):
+    """Display watchlist with interactive cards"""
+    for symbol in watchlist:
+        with st.container():
+            st.markdown(f"<div class='stock-card'>", unsafe_allow_html=True)
+            
+            try:
+                stock = yf.Ticker(symbol)
+                info = stock.info
+                hist = stock.history(period="1mo")
+                
+                col1, col2, col3 = st.columns([3, 2, 1])
+                
+                with col1:
+                    st.markdown(f"### {info.get('longName', symbol)}")
+                    st.markdown(f"**{symbol}** | {info.get('sector', 'N/A')}")
+                
+                with col2:
+                    if not hist.empty:
+                        current_price = hist["Close"][-1]
+                        prev_close = hist["Close"][-2] if len(hist) > 1 else current_price
+                        change = ((current_price - prev_close) / prev_close) * 100
+                        
+                        st.metric(
+                            label="Current Price",
+                            value=f"₹{current_price:.2f}",
+                            delta=f"{change:+.2f}%",
+                            delta_color="normal"
+                        )
+                
+                with col3:
+                    if st.button(f"Remove", key=f"remove_{symbol}"):
+                        remove_from_watchlist(user, symbol)
+                        st.success(f"Removed {symbol} from watchlist")
+                        time.sleep(1)
+                        st.rerun()
+                
+                # Additional details in expander
+                with st.expander("View Details"):
+                    tab1, tab2 = st.tabs(["Overview", "Chart"])
+                    
+                    with tab1:
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**52W High:** ₹{info.get('fiftyTwoWeekHigh', 'N/A')}")
+                            st.write(f"**52W Low:** ₹{info.get('fiftyTwoWeekLow', 'N/A')}")
+                            st.write(f"**Volume:** {info.get('volume', 'N/A')}")
+                        
+                        with col2:
+                            st.write(f"**PE Ratio:** {info.get('trailingPE', 'N/A')}")
+                            st.write(f"**Market Cap:** {info.get('marketCap', 'N/A')}")
+                            st.write(f"**Dividend Yield:** {info.get('dividendYield', 'N/A')}")
+                    
+                    with tab2:
+                        if not hist.empty:
+                            st.line_chart(hist["Close"])
+            
+            except Exception as e:
+                st.error(f"Error loading {symbol}: {str(e)}")
+            
+            st.markdown("</div>", unsafe_allow_html=True)
