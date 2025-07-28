@@ -253,7 +253,10 @@ def main():
     
     with col3:
         st.markdown(f"**Page {st.session_state.page_number + 1} of {total_pages} | Showing {len(paginated_df)} stocks**")
-# ... (keep all the existing code above main() function)
+
+if __name__ == "__main__":
+    main()
+    # ... (keep all the existing code above main() function)
 
 def main():
     st.set_page_config(
