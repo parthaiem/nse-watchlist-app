@@ -177,12 +177,12 @@ def main():
                 
                 data.append({
                     'Company': name,
-                    'Symbol': symbol,
+                    #'Symbol': symbol,
                     'LTP': current_price,
                     'Daily Change (%)': day_change,
                     'Weekly Change (%)': week_change,
                     'Monthly Change (%)': month_change,
-                    'Data Source': data_source
+                    #'Data Source': data_source
                 })
             except Exception as e:
                 st.error(f"Error processing {name}: {str(e)}")
@@ -205,8 +205,8 @@ def main():
         
         # Display using HTML to preserve styling
         st.markdown(
-            display_df[['Company', 'Symbol', 'LTP', 'Daily Change (%)', 
-                      'Weekly Change (%)', 'Monthly Change (%)', 'Data Source']]
+            display_df[['Company', 'LTP', 'Daily Change (%)', 
+                      'Weekly Change (%)', 'Monthly Change (%)']]
             .to_html(escape=False, index=False),
             unsafe_allow_html=True
         )
