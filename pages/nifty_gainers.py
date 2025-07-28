@@ -253,6 +253,117 @@ def main():
     
     with col3:
         st.markdown(f"**Page {st.session_state.page_number + 1} of {total_pages} | Showing {len(paginated_df)} stocks**")
+# ... (keep all the existing code above main() function)
+
+def main():
+    st.set_page_config(
+        page_title="Nifty 50 Dashboard",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    st.title("📊 Nifty 50 Market Dashboard")
+    
+    # Market status
+    market_open = is_market_open()
+    last_trading_day = get_last_trading_day()
+    
+    if market_open:
+        st.success("✅ **Market Status:** OPEN (Live data)")
+    else:
+        st.warning(f"""
+        ⚠️ **Market Status:** CLOSED  
+        📅 **Last trading day:** {last_trading_day.strftime('%A, %d %B %Y')}
+        """)
+    
+    # Load data only if not already loaded or refresh requested
+    if st.button("🔄 Refresh Data") or st.session_state.df is None:
+        with st.spinner("Loading market data..."):
+            st.session_state.df = load_all_data()
+            st.session_state.page_number = 0  # Reset to first page on refresh
+    
+    if st.session_state.df is None:
+        st.error("No data available. Please try again later.")
+        return
+    
+    # Get paginated data
+    total_pages = (len(st.session_state.df) // ROWS_PER_PAGE) + (1 if len(st.session_state.df) % ROWS_PER_PAGE else 0)
+    paginated_df = get_paginated_data(st.session_state.df, st.session_state.page_number, ROWS_PER_PAGE)
+    
+    # Display the table
+    display_df = paginated_df.copy()
+    display_df['Current Price'] = display_df['Current Price'].apply(format_price)
+    display_df['Daily Change (%)'] = display_df['Daily Change (%)'].apply(format_change)
+    display_df['Weekly Change (%)'] = display_df['Weekly Change (%)'].apply(format_change)
+    display_df['Monthly Change (%)'] = display_df['Monthly Change (%)'].apply(format_change)
+    display_df['52-Week High'] = display_df['52-Week High'].apply(format_price)
+    display_df['52-Week Low'] = display_df['52-Week Low'].apply(format_price)
+    
+    st.markdown(
+        display_df[[
+            'Company', 'Current Price', 'Daily Change (%)',
+            'Weekly Change (%)', 'Monthly Change (%)',
+            '52-Week High', '52-Week Low'
+        ]].to_html(escape=False, index=False),
+        unsafe_allow_html=True
+    )
+    
+    # New Section: Stocks Near 52-Week Low
+    st.markdown("---")
+    st.subheader("📉 Stocks Near 52-Week Low (Potential Buying Opportunities)")
+    
+    # Calculate distance from 52-week low (within 5%)
+    if st.session_state.df is not None:
+        df = st.session_state.df.copy()
+        df['Distance from 52W Low (%)'] = ((df['Current Price'] - df['52-Week Low']) / df['52-Week Low']) * 100
+        near_low_df = df[(df['Distance from 52W Low (%)'] <= 5) & (df['Distance from 52W Low (%)'] >= 0)].sort_values('Distance from 52W Low (%)')
+        
+        if not near_low_df.empty:
+            # Format the display dataframe
+            display_near_low = near_low_df.copy()
+            display_near_low['Current Price'] = display_near_low['Current Price'].apply(format_price)
+            display_near_low['52-Week Low'] = display_near_low['52-Week Low'].apply(format_price)
+            display_near_low['Distance from 52W Low (%)'] = display_near_low['Distance from 52W Low (%)'].apply(lambda x: f"{x:.2f}%")
+            
+            # Add color to distance column
+            def color_distance(val):
+                distance = float(val.strip('%'))
+                if distance <= 2:
+                    return f"<span style='color: red; font-weight: bold'>{val}</span>"
+                elif distance <= 5:
+                    return f"<span style='color: orange'>{val}</span>"
+                return val
+            
+            display_near_low['Distance from 52W Low (%)'] = display_near_low['Distance from 52W Low (%)'].apply(color_distance)
+            
+            st.markdown(
+                display_near_low[[
+                    'Company', 'Current Price', '52-Week Low', 
+                    'Distance from 52W Low (%)', 'Daily Change (%)'
+                ]].to_html(escape=False, index=False),
+                unsafe_allow_html=True
+            )
+            
+            st.caption("💡 **Note:** Stocks within 5% of their 52-week low. Those in red are within 2% of their low.")
+        else:
+            st.info("No stocks are currently within 5% of their 52-week low.")
+    
+    # Pagination controls at the bottom
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 1, 2])
+    
+    with col1:
+        if st.button("⏮️ Previous") and st.session_state.page_number > 0:
+            st.session_state.page_number -= 1
+            st.rerun()
+    
+    with col2:
+        if st.button("Next ⏭️") and st.session_state.page_number < total_pages - 1:
+            st.session_state.page_number += 1
+            st.rerun()
+    
+    with col3:
+        st.markdown(f"**Page {st.session_state.page_number + 1} of {total_pages} | Showing {len(paginated_df)} stocks**")
 
 if __name__ == "__main__":
     main()
