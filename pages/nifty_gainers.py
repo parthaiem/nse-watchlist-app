@@ -166,17 +166,7 @@ def main():
             unsafe_allow_html=True
         )
         
-        # Add some space and metrics
-        st.markdown("---")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Stocks Tracked", len(df))
-        with col2:
-            avg_daily_change = df['Daily Change (%)'].mean()
-            st.metric("Avg Daily Change", f"{avg_daily_change:.2f}%")
-        with col3:
-            positive_stocks = len(df[df['Daily Change (%)'] > 0])
-            st.metric("Advancing Stocks", positive_stocks)
+        
             
     except Exception as e:
         st.error(f"Error displaying data: {str(e)}")
