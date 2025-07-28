@@ -14,60 +14,12 @@ ROWS_PER_PAGE = 10
 NIFTY_50_STOCKS = {
     'ADANI PORTS': 'ADANIPORTS.NS',
     'ASIAN PAINT': 'ASIANPAINT.NS',
-    'AXIS BANK': 'AXISBANK.NS',
-    'BAJAJ AUTO': 'BAJAJ-AUTO.NS',
-    'BAJAJ FINSV': 'BAJAJFINSV.NS',
-    'BAJAJ FINANCE': 'BAJFINANCE.NS',
-    'BHARTI AIRTEL': 'BHARTIARTL.NS',
-    'BPCL': 'BPCL.NS',
-    'BRITANNIA': 'BRITANNIA.NS',
-    'CIPLA': 'CIPLA.NS',
-    'COAL INDIA': 'COALINDIA.NS',
-    'DIVIS LAB': 'DIVISLAB.NS',
-    'DR. REDDYS': 'DRREDDY.NS',
-    'EICHER MOTORS': 'EICHERMOT.NS',
-    'GRASIM': 'GRASIM.NS',
-    'HCL TECH': 'HCLTECH.NS',
-    'HDFC BANK': 'HDFCBANK.NS',
-    'HDFC LIFE': 'HDFCLIFE.NS',
-    'HERO MOTOCORP': 'HEROMOTOCO.NS',
-    'HINDALCO': 'HINDALCO.NS',
-    'HINDUNILVR': 'HINDUNILVR.NS',
-    'ICICI BANK': 'ICICIBANK.NS',
-    'INDUSIND BANK': 'INDUSINDBK.NS',
-    'INFOSYS': 'INFY.NS',
-    'ITC': 'ITC.NS',
-    'JSW STEEL': 'JSWSTEEL.NS',
-    'KOTAK BANK': 'KOTAKBANK.NS',
-    'LT': 'LT.NS',
-    'M&M': 'M&M.NS',
-    'MARUTI': 'MARUTI.NS',
-    'NESTLE': 'NESTLEIND.NS',
-    'NTPC': 'NTPC.NS',
-    'ONGC': 'ONGC.NS',
-    'POWERGRID': 'POWERGRID.NS',
-    'RELIANCE': 'RELIANCE.NS',
-    'SBILIFE': 'SBILIFE.NS',
-    'SBIN': 'SBIN.NS',
-    'SUN PHARMA': 'SUNPHARMA.NS',
-    'TATA CONSUMER': 'TATACONSUM.NS',
-    'TATA MOTORS': 'TATAMOTORS.NS',
-    'TATA STEEL': 'TATASTEEL.NS',
-    'TCS': 'TCS.NS',
-    'TECH MAHINDRA': 'TECHM.NS',
-    'TITAN': 'TITAN.NS',
-    'ULTRATECH CEMENT': 'ULTRACEMCO.NS',
-    'UPL': 'UPL.NS',
-    'WIPRO': 'WIPRO.NS'
+    # ... (rest of your stock dictionary)
 }
 
-# Initialize session state for pagination and sorting
+# Initialize session state for pagination
 if 'page_number' not in st.session_state:
     st.session_state.page_number = 0
-if 'sort_column' not in st.session_state:
-    st.session_state.sort_column = 'Company'
-if 'sort_ascending' not in st.session_state:
-    st.session_state.sort_ascending = True
 
 def is_market_open():
     """Check if market is currently open in IST"""
@@ -135,10 +87,6 @@ def get_paginated_data(df, page_number, rows_per_page):
     start_idx = page_number * rows_per_page
     end_idx = start_idx + rows_per_page
     return df.iloc[start_idx:end_idx]
-
-def sort_data(df, column, ascending):
-    """Sort data by specified column"""
-    return df.sort_values(by=column, ascending=ascending)
 
 def main():
     st.set_page_config(
@@ -217,27 +165,6 @@ def main():
         
         df = pd.DataFrame(data)
     
-    # Sorting functionality
-    sort_col1, sort_col2 = st.columns(2)
-    with sort_col1:
-        sort_column = st.selectbox(
-            "Sort by:",
-            options=['Company', 'Current Price', 'Daily Change (%)', 
-                   'Weekly Change (%)', 'Monthly Change (%)',
-                   '52-Week High', '52-Week Low'],
-            index=0
-        )
-    with sort_col2:
-        sort_order = st.radio(
-            "Sort order:",
-            options=['Ascending', 'Descending'],
-            index=0,
-            horizontal=True
-        )
-    
-    # Apply sorting
-    df = sort_data(df, sort_column, sort_order == 'Ascending')
-    
     # Get paginated data
     total_pages = (len(df) // ROWS_PER_PAGE) + (1 if len(df) % ROWS_PER_PAGE else 0)
     paginated_df = get_paginated_data(df, st.session_state.page_number, ROWS_PER_PAGE)
@@ -252,7 +179,7 @@ def main():
         display_df['52-Week High'] = display_df['52-Week High'].apply(format_price)
         display_df['52-Week Low'] = display_df['52-Week Low'].apply(format_price)
         
-        # Display table with clickable headers for sorting
+        # Display table
         st.markdown(
             display_df[[
                 'Company', 'Current Price', 'Daily Change (%)',
@@ -264,7 +191,7 @@ def main():
         
         # Pagination controls at the bottom
         st.markdown("---")
-        col1, col2, col3, col4 = st.columns([2, 1, 2, 2])
+        col1, col2, col3 = st.columns([1, 1, 2])
         
         with col1:
             if st.button("⏮️ Previous") and st.session_state.page_number > 0:
@@ -272,15 +199,12 @@ def main():
                 st.rerun()
         
         with col2:
-            st.markdown(f"**Page {st.session_state.page_number + 1} of {total_pages}**")
-        
-        with col3:
             if st.button("Next ⏭️") and st.session_state.page_number < total_pages - 1:
                 st.session_state.page_number += 1
                 st.rerun()
         
-        with col4:
-            st.markdown(f"**Showing {len(paginated_df)} of {len(df)} stocks**")
+        with col3:
+            st.markdown(f"**Page {st.session_state.page_number + 1} of {total_pages} | Showing {len(paginated_df)} stocks**")
             
     except Exception as e:
         st.error(f"Error displaying data: {str(e)}")
