@@ -92,28 +92,14 @@ def get_stock_details(symbol):
     """Get comprehensive stock details from Yahoo Finance"""
     try:
         stock = yf.Ticker(symbol)
-        
-        # Basic info
         info = stock.info
-        
-        # Historical data
         hist = stock.history(period="1y")
-        
-        # Financials
         financials = stock.financials
         balance_sheet = stock.balance_sheet
         cashflow = stock.cashflow
-        
-        # Recommendations
         recommendations = stock.recommendations
-        
-        # Major holders
         major_holders = stock.major_holders
-        
-        # Institutional holders
         institutional_holders = stock.institutional_holders
-        
-        # News
         news = stock.news
         
         return {
@@ -155,13 +141,16 @@ def display_stock_metrics(info):
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
+        current_price = info.get('currentPrice', 0)
+        previous_close = info.get('previousClose', 1)
+        change_pct = ((current_price - previous_close) / previous_close * 100) if previous_close != 0 else 0
+        change_class = "positive" if change_pct >= 0 else "negative"
+        
         st.markdown(f"""
         <div class="metric-card">
             <h4>Price</h4>
-            <h3>₹{info.get('currentPrice', 'N/A')}</h3>
-            <p>Change: <span class="{'positive' if info.get('currentPrice', 0) >= info.get('previousClose', 1) else 'negative'}">
-                {((info.get('currentPrice', 0) - info.get('previousClose', 1))/info.get('previousClose', 1)*100 if info.get('previousClose', 0) != 0 else 0:.2f}%
-            </span></p>
+            <h3>₹{current_price if current_price else 'N/A'}</h3>
+            <p>Change: <span class="{change_class}">{change_pct:.2f}%</span></p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -176,10 +165,11 @@ def display_stock_metrics(info):
         """, unsafe_allow_html=True)
     
     with col3:
+        market_cap = info.get('marketCap', 0)
         st.markdown(f"""
         <div class="metric-card">
             <h4>Financials</h4>
-            <p>Market Cap: ₹{info.get('marketCap', 'N/A')/1e7:.2f} Cr</p>
+            <p>Market Cap: ₹{market_cap/1e7:.2f} Cr</p>
             <p>ROE: {info.get('returnOnEquity', 'N/A')}</p>
             <p>ROA: {info.get('returnOnAssets', 'N/A')}</p>
         </div>
@@ -195,7 +185,7 @@ def display_stock_metrics(info):
         </div>
         """, unsafe_allow_html=True)
 
-def display_financials(financials):
+def display_financials(financials, balance_sheet, cashflow):
     """Display financial statements"""
     st.subheader("Financial Statements")
     
@@ -203,25 +193,23 @@ def display_financials(financials):
     
     with tab1:
         if not financials.empty:
-            st.dataframe(financials.style.format("{:,.2f}"))
+            st.dataframe(financials)
         else:
             st.warning("No income statement data available")
     
     with tab2:
-        balance_sheet = get_stock_details(st.session_state.selected_stock)['balance_sheet']
         if not balance_sheet.empty:
-            st.dataframe(balance_sheet.style.format("{:,.2f}"))
+            st.dataframe(balance_sheet)
         else:
             st.warning("No balance sheet data available")
     
     with tab3:
-        cashflow = get_stock_details(st.session_state.selected_stock)['cashflow']
         if not cashflow.empty:
-            st.dataframe(cashflow.style.format("{:,.2f}"))
+            st.dataframe(cashflow)
         else:
             st.warning("No cash flow data available")
 
-def display_holders(data):
+def display_holders(major_holders, institutional_holders):
     """Display shareholder information"""
     st.subheader("Shareholding Pattern")
     
@@ -229,15 +217,15 @@ def display_holders(data):
     
     with col1:
         st.markdown("**Major Holders**")
-        if not data['major_holders'].empty:
-            st.dataframe(data['major_holders'])
+        if not major_holders.empty:
+            st.dataframe(major_holders)
         else:
             st.warning("No major holders data available")
     
     with col2:
         st.markdown("**Institutional Holders**")
-        if not data['institutional_holders'].empty:
-            st.dataframe(data['institutional_holders'])
+        if not institutional_holders.empty:
+            st.dataframe(institutional_holders)
         else:
             st.warning("No institutional holders data available")
 
@@ -245,13 +233,13 @@ def display_news(news):
     """Display company news"""
     st.subheader("Latest News")
     
-    for item in news[:5]:  # Show only 5 latest news items
+    for item in news[:5]:
         st.markdown(f"""
         <div class="news-card">
-            <h4>{item['title']}</h4>
-            <p>Published: {item.get('providerPublishTime', 'N/A')}</p>
+            <h4>{item.get('title', 'No title')}</h4>
+            <p>Published: {datetime.fromtimestamp(item.get('providerPublishTime', 0)).strftime('%Y-%m-%d %H:%M') if item.get('providerPublishTime') else 'N/A'}</p>
             <p>Source: {item.get('publisher', 'N/A')}</p>
-            <a href="{item['link']}" target="_blank">Read more</a>
+            <a href="{item.get('link', '#')}" target="_blank">Read more</a>
         </div>
         """, unsafe_allow_html=True)
 
@@ -292,10 +280,10 @@ def main():
         tab1, tab2, tab3, tab4 = st.tabs(["Financials", "Holdings", "News", "Charts"])
         
         with tab1:
-            display_financials(stock_data['financials'])
+            display_financials(stock_data['financials'], stock_data['balance_sheet'], stock_data['cashflow'])
         
         with tab2:
-            display_holders(stock_data)
+            display_holders(stock_data['major_holders'], stock_data['institutional_holders'])
         
         with tab3:
             display_news(stock_data['news'])
