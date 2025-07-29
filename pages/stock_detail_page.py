@@ -1,62 +1,318 @@
 import streamlit as st
 import yfinance as yf
-import plotly.graph_objs as go
+import pandas as pd
+import requests
+from datetime import datetime
+from bs4 import BeautifulSoup
 
-st.set_page_config(page_title="Stock Details", layout="wide")
+# Configuration
+st.set_page_config(page_title="Stock Analysis Dashboard", layout="wide")
 
-# --- Read stock symbol from query params ---
-query_params = st.experimental_get_query_params()
-symbol = query_params.get("stock", [None])[0]
+# Custom CSS
+st.markdown("""
+<style>
+    .positive { color: green; font-weight: bold; }
+    .negative { color: red; font-weight: bold; }
+    .metric-card { 
+        border: 1px solid #ddd; 
+        border-radius: 5px; 
+        padding: 15px; 
+        margin: 10px 0;
+        background-color: #f9f9f9;
+    }
+    .stock-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .news-card {
+        border: 1px solid #eee;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 10px 0;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-if not symbol:
-    st.error("No stock selected.")
-    st.stop()
+# Nifty 50 stocks with symbols
+NIFTY_50 = {
+    'RELIANCE': 'RELIANCE.NS',
+    'TCS': 'TCS.NS',
+    'HDFC BANK': 'HDFCBANK.NS',
+    'ICICI BANK': 'ICICIBANK.NS',
+    'HUL': 'HINDUNILVR.NS',
+    'INFOSYS': 'INFY.NS',
+    'ITC': 'ITC.NS',
+    'SBIN': 'SBIN.NS',
+    'BHARTI AIRTEL': 'BHARTIARTL.NS',
+    'LT': 'LT.NS',
+    'KOTAK BANK': 'KOTAKBANK.NS',
+    'HDFC': 'HDFC.NS',
+    'ASIAN PAINT': 'ASIANPAINT.NS',
+    'DMART': 'DMART.NS',
+    'ULTRACEMCO': 'ULTRACEMCO.NS',
+    'BAJFINANCE': 'BAJFINANCE.NS',
+    'WIPRO': 'WIPRO.NS',
+    'ONGC': 'ONGC.NS',
+    'NTPC': 'NTPC.NS',
+    'NESTLE': 'NESTLEIND.NS',
+    'TITAN': 'TITAN.NS',
+    'ADANI PORTS': 'ADANIPORTS.NS',
+    'M&M': 'M&M.NS',
+    'SUN PHARMA': 'SUNPHARMA.NS',
+    'BAJAJ AUTO': 'BAJAJ-AUTO.NS',
+    'TATA STEEL': 'TATASTEEL.NS',
+    'POWERGRID': 'POWERGRID.NS',
+    'JSW STEEL': 'JSWSTEEL.NS',
+    'AXIS BANK': 'AXISBANK.NS',
+    'TECHM': 'TECHM.NS',
+    'HCLTECH': 'HCLTECH.NS',
+    'GRASIM': 'GRASIM.NS',
+    'BRITANNIA': 'BRITANNIA.NS',
+    'EICHERMOT': 'EICHERMOT.NS',
+    'DIVISLAB': 'DIVISLAB.NS',
+    'DRREDDY': 'DRREDDY.NS',
+    'CIPLA': 'CIPLA.NS',
+    'UPL': 'UPL.NS',
+    'BAJAJFINSV': 'BAJAJFINSV.NS',
+    'MARUTI': 'MARUTI.NS',
+    'COALINDIA': 'COALINDIA.NS',
+    'TATAMOTORS': 'TATAMOTORS.NS',
+    'BPCL': 'BPCL.NS',
+    'INDUSINDBK': 'INDUSINDBK.NS',
+    'HEROMOTOCO': 'HEROMOTOCO.NS',
+    'HINDALCO': 'HINDALCO.NS',
+    'TATACONSUM': 'TATACONSUM.NS',
+    'SHREECEM': 'SHREECEM.NS',
+    'SBILIFE': 'SBILIFE.NS',
+    'HDFCLIFE': 'HDFCLIFE.NS'
+}
 
-ticker = yf.Ticker(symbol)
-info = ticker.info
+def get_stock_details(symbol):
+    """Get comprehensive stock details from Yahoo Finance"""
+    try:
+        stock = yf.Ticker(symbol)
+        
+        # Basic info
+        info = stock.info
+        
+        # Historical data
+        hist = stock.history(period="1y")
+        
+        # Financials
+        financials = stock.financials
+        balance_sheet = stock.balance_sheet
+        cashflow = stock.cashflow
+        
+        # Recommendations
+        recommendations = stock.recommendations
+        
+        # Major holders
+        major_holders = stock.major_holders
+        
+        # Institutional holders
+        institutional_holders = stock.institutional_holders
+        
+        # News
+        news = stock.news
+        
+        return {
+            'info': info,
+            'hist': hist,
+            'financials': financials,
+            'balance_sheet': balance_sheet,
+            'cashflow': cashflow,
+            'recommendations': recommendations,
+            'major_holders': major_holders,
+            'institutional_holders': institutional_holders,
+            'news': news
+        }
+    except Exception as e:
+        st.error(f"Error fetching data: {str(e)}")
+        return None
 
-st.title(f"📊 {info.get('longName', symbol)} ({symbol})")
+def get_market_news():
+    """Fetch market news from Moneycontrol"""
+    try:
+        url = "https://www.moneycontrol.com/news/business/stocks/"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        news_items = soup.find_all('li', {'class': 'clearfix'})[:5]
+        
+        news_list = []
+        for item in news_items:
+            title = item.find('h2').text.strip()
+            link = item.find('a')['href']
+            news_list.append({'title': title, 'link': link})
+        
+        return news_list
+    except Exception as e:
+        st.warning(f"Could not fetch news: {str(e)}")
+        return []
 
-# --- Price Chart ---
-st.subheader("📈 Price Chart (Last 6 Months)")
+def display_stock_metrics(info):
+    """Display key stock metrics in cards"""
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h4>Price</h4>
+            <h3>₹{info.get('currentPrice', 'N/A')}</h3>
+            <p>Change: <span class="{'positive' if info.get('currentPrice', 0) >= info.get('previousClose', 1) else 'negative'}">
+                {((info.get('currentPrice', 0) - info.get('previousClose', 1))/info.get('previousClose', 1)*100 if info.get('previousClose', 0) != 0 else 0:.2f}%
+            </span></p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h4>Valuation</h4>
+            <p>PE: {info.get('trailingPE', 'N/A')}</p>
+            <p>P/B: {info.get('priceToBook', 'N/A')}</p>
+            <p>P/S: {info.get('priceToSalesTrailing12Months', 'N/A')}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h4>Financials</h4>
+            <p>Market Cap: ₹{info.get('marketCap', 'N/A')/1e7:.2f} Cr</p>
+            <p>ROE: {info.get('returnOnEquity', 'N/A')}</p>
+            <p>ROA: {info.get('returnOnAssets', 'N/A')}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h4>Dividend</h4>
+            <p>Yield: {info.get('dividendYield', 'N/A')}</p>
+            <p>Rate: {info.get('dividendRate', 'N/A')}</p>
+            <p>Payout: {info.get('payoutRatio', 'N/A')}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-hist = ticker.history(period="6mo")
-if hist.empty:
-    st.warning("No historical data available.")
-else:
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=hist.index, y=hist["Close"],
-        mode='lines', name="Close Price"
-    ))
-    fig.update_layout(title=f"{symbol} Closing Price", xaxis_title="Date", yaxis_title="Price (INR)")
-    st.plotly_chart(fig, use_container_width=True)
+def display_financials(financials):
+    """Display financial statements"""
+    st.subheader("Financial Statements")
+    
+    tab1, tab2, tab3 = st.tabs(["Income Statement", "Balance Sheet", "Cash Flow"])
+    
+    with tab1:
+        if not financials.empty:
+            st.dataframe(financials.style.format("{:,.2f}"))
+        else:
+            st.warning("No income statement data available")
+    
+    with tab2:
+        balance_sheet = get_stock_details(st.session_state.selected_stock)['balance_sheet']
+        if not balance_sheet.empty:
+            st.dataframe(balance_sheet.style.format("{:,.2f}"))
+        else:
+            st.warning("No balance sheet data available")
+    
+    with tab3:
+        cashflow = get_stock_details(st.session_state.selected_stock)['cashflow']
+        if not cashflow.empty:
+            st.dataframe(cashflow.style.format("{:,.2f}"))
+        else:
+            st.warning("No cash flow data available")
 
-# --- Key Financial Metrics ---
-st.subheader("📌 Key Metrics")
+def display_holders(data):
+    """Display shareholder information"""
+    st.subheader("Shareholding Pattern")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Major Holders**")
+        if not data['major_holders'].empty:
+            st.dataframe(data['major_holders'])
+        else:
+            st.warning("No major holders data available")
+    
+    with col2:
+        st.markdown("**Institutional Holders**")
+        if not data['institutional_holders'].empty:
+            st.dataframe(data['institutional_holders'])
+        else:
+            st.warning("No institutional holders data available")
 
-col1, col2, col3 = st.columns(3)
-col1.metric("📈 Current Price", f"₹{hist['Close'][-1]:.2f}")
-col2.metric("52W High", f"₹{hist['High'].max():.2f}")
-col3.metric("52W Low", f"₹{hist['Low'].min():.2f}")
+def display_news(news):
+    """Display company news"""
+    st.subheader("Latest News")
+    
+    for item in news[:5]:  # Show only 5 latest news items
+        st.markdown(f"""
+        <div class="news-card">
+            <h4>{item['title']}</h4>
+            <p>Published: {item.get('providerPublishTime', 'N/A')}</p>
+            <p>Source: {item.get('publisher', 'N/A')}</p>
+            <a href="{item['link']}" target="_blank">Read more</a>
+        </div>
+        """, unsafe_allow_html=True)
 
-col4, col5, col6 = st.columns(3)
-col4.metric("🧮 P/E Ratio", f"{info.get('trailingPE', 'N/A')}")
-col5.metric("📊 EPS (TTM)", f"{info.get('trailingEps', 'N/A')}")
-col6.metric("🏢 Market Cap", f"{info.get('marketCap', 'N/A'):,}")
+def main():
+    st.title("📊 Comprehensive Stock Analysis Dashboard")
+    
+    # Initialize session state
+    if 'selected_stock' not in st.session_state:
+        st.session_state.selected_stock = 'RELIANCE.NS'
+    
+    # Search bar
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        search_query = st.selectbox("Search for a stock:", list(NIFTY_50.keys()))
+    with col2:
+        if st.button("Search"):
+            st.session_state.selected_stock = NIFTY_50[search_query]
+            st.rerun()
+    
+    # Get stock data
+    stock_data = get_stock_details(st.session_state.selected_stock)
+    
+    if stock_data:
+        info = stock_data['info']
+        
+        # Display stock header
+        st.markdown(f"""
+        <div class="stock-header">
+            <h2>{info.get('longName', 'N/A')} ({st.session_state.selected_stock})</h2>
+            <p>Sector: {info.get('sector', 'N/A')} | Industry: {info.get('industry', 'N/A')}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Display key metrics
+        display_stock_metrics(info)
+        
+        # Tabs for different sections
+        tab1, tab2, tab3, tab4 = st.tabs(["Financials", "Holdings", "News", "Charts"])
+        
+        with tab1:
+            display_financials(stock_data['financials'])
+        
+        with tab2:
+            display_holders(stock_data)
+        
+        with tab3:
+            display_news(stock_data['news'])
+        
+        with tab4:
+            st.subheader("Price Chart (1 Year)")
+            if not stock_data['hist'].empty:
+                st.line_chart(stock_data['hist']['Close'])
+            else:
+                st.warning("No historical data available")
+    
+    # Market news section
+    st.markdown("---")
+    st.subheader("📰 Latest Market News")
+    market_news = get_market_news()
+    for news in market_news:
+        st.markdown(f"- [{news['title']}]({news['link']})")
 
-# --- Profit and Sales ---
-st.subheader("📋 Financial Summary (Latest)")
-
-st.write(f"**Net Profit:** ₹{info.get('netIncomeToCommon', 'N/A'):,}")
-st.write(f"**Revenue (Net Sales):** ₹{info.get('totalRevenue', 'N/A'):,}")
-st.write(f"**Book Value:** ₹{info.get('bookValue', 'N/A')}")
-st.write(f"**ROE:** {info.get('returnOnEquity', 'N/A'):.2%}" if info.get("returnOnEquity") else "ROE: N/A")
-
-# --- Company Overview ---
-st.subheader("🏢 Company Overview")
-business_summary = info.get("longBusinessSummary", "No company description available.")
-st.write(business_summary)
-
-# --- Back Button ---
-st.markdown("### 🔙 [Back to Watchlist](./)")
+if __name__ == "__main__":
+    main()
