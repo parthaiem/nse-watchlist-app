@@ -150,9 +150,11 @@ def load_all_data():
             
         current_data = stock_data['current_data']
         if is_market_open():
+            # During market hours, use the last close price from previous day as prev_close
+            prev_close = safe_float(current_data.iloc[0]['Close'])
             current_price = safe_float(current_data.iloc[-1]['Close'])
-            prev_close = safe_float(current_data.iloc[0]['Open'] if len(current_data) > 1 else current_data.iloc[-1]['Close'])
         else:
+            # When market is closed, use previous day's close as prev_close
             trading_days = current_data[current_data['Volume'] > 0]
             if trading_days.empty:
                 continue
@@ -256,4 +258,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
