@@ -85,30 +85,6 @@ def get_last_trading_day():
             return prev_day
     return day  # fallback
 
-def get_stock_data(symbol):
-    """Get stock data with error handling"""
-    try:
-        ticker = yf.Ticker(symbol)
-        
-        # Get current data (1d for intraday or 5d for last close)
-        current_data = ticker.history(period="1d" if is_market_open() else "5d")
-        if current_data.empty:
-            return None
-            
-        # Get 52-week data
-        yearly_data = ticker.history(period="1y")
-        high_52w = yearly_data['High'].max() if not yearly_data.empty else None
-        low_52w = yearly_data['Low'].min() if not yearly_data.empty else None
-        
-        return {
-            'current_data': current_data,
-            'high_52w': high_52w,
-            'low_52w': low_52w
-        }
-    except Exception as e:
-        st.error(f"Error fetching {symbol}: {str(e)}")
-        return None
-
 def safe_float(value, default=0.0):
     """Safely convert to float with fallback"""
     try:
@@ -144,44 +120,60 @@ def load_all_data():
     total_stocks = len(NIFTY_50_STOCKS)
     
     for i, (name, symbol) in enumerate(NIFTY_50_STOCKS.items()):
-        stock_data = get_stock_data(symbol)
-        if stock_data is None:
+        try:
+            ticker = yf.Ticker(symbol)
+            
+            if is_market_open():
+                # During market hours - get current price and previous close separately
+                current_data = ticker.history(period="1d", interval="5m")
+                if current_data.empty:
+                    continue
+                current_price = safe_float(current_data.iloc[-1]['Close'])
+                
+                # Get previous day's close separately
+                prev_data = ticker.history(period="2d")
+                if len(prev_data) < 2:
+                    continue
+                prev_close = safe_float(prev_data.iloc[-2]['Close'])
+            else:
+                # When market is closed
+                current_data = ticker.history(period="5d")
+                trading_days = current_data[current_data['Volume'] > 0]
+                if trading_days.empty:
+                    continue
+                current_price = safe_float(trading_days.iloc[-1]['Close'])
+                prev_close = safe_float(trading_days.iloc[-2]['Close'] if len(trading_days) > 1 else trading_days.iloc[-1]['Open'])
+            
+            # Calculate daily change
+            day_change = ((current_price - prev_close) / prev_close) * 100 if prev_close != 0 else 0
+            
+            # Get 52-week data
+            yearly_data = ticker.history(period="1y")
+            high_52w = yearly_data['High'].max() if not yearly_data.empty else None
+            low_52w = yearly_data['Low'].min() if not yearly_data.empty else None
+            
+            # Get weekly change (5 trading days)
+            weekly_data = ticker.history(period="5d")
+            week_change = ((current_price - weekly_data.iloc[0]['Close']) / weekly_data.iloc[0]['Close']) * 100 if not weekly_data.empty and len(weekly_data) > 1 else None
+            
+            # Get monthly change (1 month)
+            monthly_data = ticker.history(period="1mo")
+            month_change = ((current_price - monthly_data.iloc[0]['Close']) / monthly_data.iloc[0]['Close']) * 100 if not monthly_data.empty and len(monthly_data) > 1 else None
+            
+            data.append({
+                'Company': name,
+                'Current Price': current_price,
+                'Daily Change (%)': day_change,
+                'Weekly Change (%)': week_change,
+                'Monthly Change (%)': month_change,
+                '52-Week High': high_52w,
+                '52-Week Low': low_52w
+            })
+            
+        except Exception as e:
+            st.error(f"Error processing {name}: {str(e)}")
             continue
             
-        current_data = stock_data['current_data']
-        if is_market_open():
-            # During market hours, use the last close price from previous day as prev_close
-            prev_close = safe_float(current_data.iloc[0]['Close'])
-            current_price = safe_float(current_data.iloc[-1]['Close'])
-        else:
-            # When market is closed, use previous day's close as prev_close
-            trading_days = current_data[current_data['Volume'] > 0]
-            if trading_days.empty:
-                continue
-            current_price = safe_float(trading_days.iloc[-1]['Close'])
-            prev_close = safe_float(trading_days.iloc[-2]['Close'] if len(trading_days) > 1 else trading_days.iloc[-1]['Open'])
-        
-        # Calculate changes
-        day_change = ((current_price - prev_close) / prev_close) * 100 if prev_close != 0 else 0
-        
-        # Get weekly change
-        weekly_data = yf.Ticker(symbol).history(period="5d")
-        week_change = ((current_price - weekly_data.iloc[0]['Close']) / weekly_data.iloc[0]['Close']) * 100 if not weekly_data.empty else None
-        
-        # Get monthly change
-        monthly_data = yf.Ticker(symbol).history(period="1mo")
-        month_change = ((current_price - monthly_data.iloc[0]['Close']) / monthly_data.iloc[0]['Close']) * 100 if not monthly_data.empty else None
-        
-        data.append({
-            'Company': name,
-            'Current Price': current_price,
-            'Daily Change (%)': day_change,
-            'Weekly Change (%)': week_change,
-            'Monthly Change (%)': month_change,
-            '52-Week High': stock_data['high_52w'],
-            '52-Week Low': stock_data['low_52w']
-        })
-        
         progress_bar.progress((i + 1) / total_stocks)
     
     return pd.DataFrame(data) if data else None
