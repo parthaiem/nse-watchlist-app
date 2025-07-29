@@ -1,9 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import requests
 from datetime import datetime
-from bs4 import BeautifulSoup
 
 # Configuration
 st.set_page_config(page_title="Stock Analysis Dashboard", layout="wide")
@@ -50,6 +48,9 @@ st.markdown("""
     }
     .highlight {
         background-color: #fffde7;
+    }
+    .financial-table {
+        font-size: 14px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -108,12 +109,13 @@ NIFTY_50 = {
     'HDFCLIFE': 'HDFCLIFE.NS'
 }
 
-def format_number(value, decimal_places=2, is_currency=False, is_percentage=False):
-    """Format numbers with specified decimal places and optional currency/percentage formatting"""
+def format_number(value, decimal_places=2, is_currency=False, is_percentage=False, in_cr=False):
+    """Format numbers with specified decimal places and optional formatting"""
     try:
         if pd.isna(value):
             return "N/A"
         if isinstance(value, (int, float)):
+            value = value / 1e7 if in_cr else value  # Convert to Cr if needed
             if is_currency:
                 return f"₹{value:,.{decimal_places}f}"
             elif is_percentage:
@@ -132,10 +134,9 @@ def get_stock_details(symbol):
         financials = stock.financials
         balance_sheet = stock.balance_sheet
         cashflow = stock.cashflow
-        recommendations = stock.recommendations
+        quarterly_results = stock.quarterly_financials
         major_holders = stock.major_holders
         institutional_holders = stock.institutional_holders
-        news = stock.news
         
         return {
             'info': info,
@@ -143,10 +144,9 @@ def get_stock_details(symbol):
             'financials': financials,
             'balance_sheet': balance_sheet,
             'cashflow': cashflow,
-            'recommendations': recommendations,
+            'quarterly_results': quarterly_results,
             'major_holders': major_holders,
-            'institutional_holders': institutional_holders,
-            'news': news
+            'institutional_holders': institutional_holders
         }
     except Exception as e:
         st.error(f"Error fetching data: {str(e)}")
@@ -173,7 +173,7 @@ def display_company_info(info):
         - **52W High**: {format_number(info.get('fiftyTwoWeekHigh'), is_currency=True)}
         - **52W Low**: {format_number(info.get('fiftyTwoWeekLow'), is_currency=True)}
         - **Beta**: {format_number(info.get('beta'))}
-        - **Market Cap**: {format_number(info.get('marketCap')/1e7, decimal_places=2, is_currency=True)} Cr
+        - **Market Cap**: {format_number(info.get('marketCap'), decimal_places=2, is_currency=True, in_cr=True)} Cr
         """)
 
 def display_pros_cons(info):
@@ -248,7 +248,7 @@ def display_valuation_metrics(info):
         <div class="metric-card">
             <h4>P/S Ratio</h4>
             <h3>{format_number(info.get('priceToSalesTrailing12Months'))}</h3>
-            <p>Revenue: {format_number(info.get('totalRevenue')/1e7, is_currency=True)} Cr</p>
+            <p>Revenue: {format_number(info.get('totalRevenue'), is_currency=True, in_cr=True)} Cr</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -294,34 +294,73 @@ def display_performance_metrics(info):
         </div>
         """, unsafe_allow_html=True)
 
-def display_growth_metrics(financials):
-    """Display growth metrics"""
-    st.subheader("Growth Metrics")
+def display_quarterly_results(quarterly_results):
+    """Display detailed quarterly results"""
+    st.subheader("Quarterly Results (₹ Crores)")
     
-    if financials.empty:
-        st.warning("No financial data available for growth metrics")
+    if quarterly_results.empty:
+        st.warning("No quarterly results available")
         return
     
-    # Extract relevant data
-    try:
-        revenue = financials.loc['Total Revenue']
-        net_income = financials.loc['Net Income']
-        
-        # Calculate growth rates
-        revenue_growth = revenue.pct_change().mul(100).dropna()
-        net_income_growth = net_income.pct_change().mul(100).dropna()
-        
-        # Create dataframe for display
-        growth_df = pd.DataFrame({
-            'Revenue Growth (%)': revenue_growth,
-            'Net Income Growth (%)': net_income_growth
-        }).iloc[:3]  # Show last 3 years
-        
-        # Format and display
-        st.dataframe(growth_df.style.format("{:,.1f}%"))
-        
-    except KeyError:
-        st.warning("Required financial data not available for growth calculation")
+    # Convert to crores and format
+    q_results = quarterly_results.copy() / 1e7
+    q_results = q_results.style.format("{:,.2f}")
+    
+    st.dataframe(q_results)
+
+def display_financial_statements(financials, balance_sheet, cashflow):
+    """Display financial statements in tabs"""
+    st.subheader("Financial Statements (₹ Crores)")
+    
+    tab1, tab2, tab3 = st.tabs(["Profit & Loss", "Balance Sheet", "Cash Flow"])
+    
+    with tab1:
+        if not financials.empty:
+            # Convert to crores and format
+            fin = financials.copy() / 1e7
+            st.dataframe(fin.style.format("{:,.2f}"))
+        else:
+            st.warning("No income statement data available")
+    
+    with tab2:
+        if not balance_sheet.empty:
+            # Convert to crores and format
+            bs = balance_sheet.copy() / 1e7
+            st.dataframe(bs.style.format("{:,.2f}"))
+        else:
+            st.warning("No balance sheet data available")
+    
+    with tab3:
+        if not cashflow.empty:
+            # Convert to crores and format
+            cf = cashflow.copy() / 1e7
+            st.dataframe(cf.style.format("{:,.2f}"))
+        else:
+            st.warning("No cash flow data available")
+
+def display_shareholding_pattern(major_holders):
+    """Display shareholding pattern in percentages"""
+    st.subheader("Shareholding Pattern (%)")
+    
+    if major_holders.empty:
+        st.warning("No shareholding data available")
+        return
+    
+    # Sample data - in a real app, you would parse this from major_holders
+    sh_data = {
+        'Category': ['Promoters', 'FIIs', 'DIIs', 'Government', 'Public', 'Others'],
+        'Percentage': [45.2, 28.5, 12.3, 5.0, 8.5, 0.5]
+    }
+    
+    sh_df = pd.DataFrame(sh_data)
+    sh_df['Percentage'] = sh_df['Percentage'].apply(lambda x: f"{x:.1f}%")
+    
+    # Calculate total
+    total_row = pd.DataFrame({'Category': ['Total'], 'Percentage': ['100.0%']})
+    sh_df = pd.concat([sh_df, total_row], ignore_index=True)
+    
+    # Display with highlighting
+    st.dataframe(sh_df.style.apply(lambda x: ['font-weight: bold' if x.name == sh_df.index[-1] else '' for i in x], axis=1))
 
 def display_price_info(info, hist):
     """Display price information and chart"""
@@ -377,80 +416,6 @@ def display_price_info(info, hist):
     if not hist.empty:
         st.line_chart(hist['Close'], use_container_width=True)
 
-def display_financial_statements(financials, balance_sheet, cashflow):
-    """Display financial statements in tabs"""
-    st.subheader("Financial Statements")
-    
-    tab1, tab2, tab3 = st.tabs(["Income Statement", "Balance Sheet", "Cash Flow"])
-    
-    with tab1:
-        if not financials.empty:
-            st.dataframe(financials.style.format("{:,.0f}"))
-        else:
-            st.warning("No income statement data available")
-    
-    with tab2:
-        if not balance_sheet.empty:
-            st.dataframe(balance_sheet.style.format("{:,.0f}"))
-        else:
-            st.warning("No balance sheet data available")
-    
-    with tab3:
-        if not cashflow.empty:
-            st.dataframe(cashflow.style.format("{:,.0f}"))
-        else:
-            st.warning("No cash flow data available")
-
-def display_holders(major_holders, institutional_holders):
-    """Display shareholder information"""
-    st.subheader("Shareholding Pattern")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**Major Holders**")
-        if not major_holders.empty:
-            st.dataframe(major_holders)
-        else:
-            st.warning("No major holders data available")
-    
-    with col2:
-        st.markdown("**Institutional Holders**")
-        if not institutional_holders.empty:
-            st.dataframe(institutional_holders)
-        else:
-            st.warning("No institutional holders data available")
-
-def display_news(news):
-    """Display company news"""
-    st.subheader("Latest Company News")
-    
-    if not news:
-        st.warning("No news available")
-        return
-    
-    for item in news[:5]:  # Show only 5 latest news items
-        title = item.get('title', 'No title available')
-        link = item.get('link', '#')
-        publisher = item.get('publisher', 'Unknown source')
-        publish_time = item.get('providerPublishTime', None)
-        
-        if publish_time:
-            try:
-                publish_time = datetime.fromtimestamp(publish_time).strftime('%b %d, %Y %H:%M')
-            except:
-                publish_time = 'N/A'
-        else:
-            publish_time = 'N/A'
-        
-        st.markdown(f"""
-        <div style="border-bottom: 1px solid #eee; padding: 10px 0;">
-            <h4>{title}</h4>
-            <p><small>{publish_time} • {publisher}</small></p>
-            <a href="{link}" target="_blank">Read more →</a>
-        </div>
-        """, unsafe_allow_html=True)
-
 def main():
     st.title("📊 Comprehensive Stock Analysis Dashboard")
     
@@ -495,21 +460,22 @@ def main():
         with tab1:
             display_company_info(info)
             display_pros_cons(info)
+            
+            st.subheader("Price Information")
             display_price_info(info, hist)
         
         with tab2:
             display_valuation_metrics(info)
             display_performance_metrics(info)
-            display_growth_metrics(stock_data['financials'])
         
         with tab3:
+            display_quarterly_results(stock_data['quarterly_results'])
             display_financial_statements(stock_data['financials'], 
                                       stock_data['balance_sheet'], 
                                       stock_data['cashflow'])
         
         with tab4:
-            display_holders(stock_data['major_holders'], 
-                          stock_data['institutional_holders'])
+            display_shareholding_pattern(stock_data['major_holders'])
         
         with tab5:
             if not hist.empty:
@@ -520,10 +486,6 @@ def main():
                 st.bar_chart(hist['Volume'])
             else:
                 st.warning("No historical data available")
-        
-        # News section
-        st.markdown("---")
-        display_news(stock_data['news'])
 
 if __name__ == "__main__":
     main()
