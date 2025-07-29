@@ -318,7 +318,7 @@ def display_growth_metrics(financials):
         }).iloc[:3]  # Show last 3 years
         
         # Format and display
-        st.dataframe(growth_df.style.format("{:,.1f}%")
+        st.dataframe(growth_df.style.format("{:,.1f}%"))
         
     except KeyError:
         st.warning("Required financial data not available for growth calculation")
