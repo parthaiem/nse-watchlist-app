@@ -51,23 +51,13 @@ def show_footer():
         </div>
     """, unsafe_allow_html=True)
 
-# Function to style percentage changes
-def color_percent(val):
-    if isinstance(val, (int, float)):
-        color = 'green' if val >= 0 else 'red'
-        return f'color: {color}; font-weight: bold;'
-    return ''
-
-# Function to style day range with two colors
-def color_day_range(val):
-    if isinstance(val, str) and '-' in val:
-        low, high = val.split('-')
-        return f'color: red; font-weight: bold;', f'color: green; font-weight: bold;'
-    return '', ''
-
 # Function to format numbers with 2 decimal places
-def format_number(x):
+def format_number(x, is_currency=False, is_percent=False):
     if isinstance(x, (int, float)):
+        if is_percent:
+            return f"{x:+.2f}%"
+        if is_currency:
+            return f"${x:,.2f}" if x >= 100 else f"${x:,.4f}"
         return f"{x:,.2f}"
     return str(x)
 
@@ -154,8 +144,7 @@ def get_market_data():
                         "Symbol": symbol,
                         "Price": current,
                         "Change (%)": change,
-                        "Day Range": day_range,
-                        "Last Updated": datetime.now().strftime("%Y-%m-%d %H:%M")
+                        "Day Range": day_range
                     })
             except Exception as e:
                 st.warning(f"Could not load {name}: {str(e)}")
@@ -182,25 +171,13 @@ def main():
         .big-font {
             font-size:18px !important;
         }
-        .metric-box {
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 5px 0;
-            background-color: #f9f9f9;
+        .positive {
+            color: green;
+            font-weight: bold;
         }
-        .dataframe th, .dataframe td {
-            white-space: nowrap;
-        }
-        .highlight-green {
-            background-color: #e6f7e6;
-        }
-        .highlight-red {
-            background-color: #ffebee;
-        }
-        .country-flag {
-            font-size: 1.5em;
-            margin-right: 5px;
+        .negative {
+            color: red;
+            font-weight: bold;
         }
         .day-range-low {
             color: red;
@@ -230,140 +207,49 @@ def main():
         "💱 Currencies"
     ])
     
+    def display_tab_data(df, currency_symbol=""):
+        display_df = df.copy()
+        display_df["Price"] = display_df["Price"].apply(lambda x: f"{currency_symbol}{format_number(x)}")
+        display_df["Change (%)"] = display_df["Change (%)"].apply(
+            lambda x: f"<span class='{'positive' if x >= 0 else 'negative'}'>{format_number(x, is_percent=True)}</span>",
+            na_action='ignore'
+        )
+        
+        # Split Day Range into two colored parts
+        display_df["Day Range"] = display_df["Day Range"].apply(
+            lambda x: f"<span class='day-range-low'>{x.split(' - ')[0]}</span> - <span class='day-range-high'>{x.split(' - ')[1]}</span>"
+            if isinstance(x, str) and ' - ' in x else x
+        )
+        
+        st.markdown(
+            display_df[["Name", "Price", "Change (%)", "Day Range"]].to_html(escape=False, index=False),
+            unsafe_allow_html=True
+        )
+    
     with tab1:
         st.subheader("🌐 Global Market Indices")
-        global_data = market_data[market_data["Category"] == "Global Indices"].copy()
-        
-        # Format the data before display
-        display_data = global_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
-        display_data["Price"] = display_data["Price"].apply(format_number)
-        display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        
-        # Apply styling
-        styled_data = display_data.style.format({
-            "Price": "{:,.2f}",
-            "Change (%)": "{:+.2f}%"
-        }).applymap(color_percent, subset=["Change (%)"])
-        
-        st.dataframe(
-            styled_data,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Name": "Index",
-                "Price": st.column_config.NumberColumn("Price"),
-                "Change (%)": "Change",
-                "Day Range": "Day Range"
-            }
-        )
+        global_data = market_data[market_data["Category"] == "Global Indices"]
+        display_tab_data(global_data)
     
     with tab2:
         st.subheader("🛢️ Commodities Market")
-        commodities_data = market_data[market_data["Category"] == "Commodities"].copy()
-        
-        # Format the data before display
-        display_data = commodities_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
-        display_data["Price"] = display_data["Price"].apply(lambda x: f"${format_number(x)}")
-        display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        
-        # Apply styling
-        styled_data = display_data.style.format({
-            "Price": "${:,.2f}",
-            "Change (%)": "{:+.2f}%"
-        }).applymap(color_percent, subset=["Change (%)"])
-        
-        st.dataframe(
-            styled_data,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Name": "Commodity",
-                "Price": "Price",
-                "Change (%)": "Change",
-                "Day Range": "Day Range"
-            }
-        )
+        commodities_data = market_data[market_data["Category"] == "Commodities"]
+        display_tab_data(commodities_data, "$")
     
     with tab3:
         st.subheader("🇮🇳 Indian Sectoral Indices")
-        sectors_data = market_data[market_data["Category"] == "Indian Sectors"].copy()
-        
-        # Format the data before display
-        display_data = sectors_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
-        display_data["Price"] = display_data["Price"].apply(lambda x: f"₹{format_number(x)}")
-        display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        
-        # Apply styling
-        styled_data = display_data.style.format({
-            "Price": "₹{:,.2f}",
-            "Change (%)": "{:+.2f}%"
-        }).applymap(color_percent, subset=["Change (%)"])
-        
-        st.dataframe(
-            styled_data,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Name": "Sector",
-                "Price": "Price",
-                "Change (%)": "Change",
-                "Day Range": "Day Range"
-            }
-        )
+        sectors_data = market_data[market_data["Category"] == "Indian Sectors"]
+        display_tab_data(sectors_data, "₹")
     
     with tab4:
         st.subheader("₿ Cryptocurrencies")
-        crypto_data = market_data[market_data["Category"] == "Cryptocurrencies"].copy()
-        
-        # Format the data before display
-        display_data = crypto_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
-        display_data["Price"] = display_data["Price"].apply(lambda x: f"${format_number(x)}")
-        display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        
-        # Apply styling
-        styled_data = display_data.style.format({
-            "Price": "${:,.2f}",
-            "Change (%)": "{:+.2f}%"
-        }).applymap(color_percent, subset=["Change (%)"])
-        
-        st.dataframe(
-            styled_data,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Name": "Crypto",
-                "Price": "Price",
-                "Change (%)": "Change",
-                "Day Range": "Day Range"
-            }
-        )
+        crypto_data = market_data[market_data["Category"] == "Cryptocurrencies"]
+        display_tab_data(crypto_data, "$")
     
     with tab5:
         st.subheader("💱 Currency Pairs")
-        currency_data = market_data[market_data["Category"] == "Currencies"].copy()
-        
-        # Format the data before display
-        display_data = currency_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
-        display_data["Price"] = display_data["Price"].apply(lambda x: f"{float(x):.4f}")
-        display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        
-        # Apply styling
-        styled_data = display_data.style.format({
-            "Price": "{:.4f}",
-            "Change (%)": "{:+.2f}%"
-        }).applymap(color_percent, subset=["Change (%)"])
-        
-        st.dataframe(
-            styled_data,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Name": "Currency Pair",
-                "Price": "Price",
-                "Change (%)": "Change",
-                "Day Range": "Day Range"
-            }
-        )
+        currency_data = market_data[market_data["Category"] == "Currencies"]
+        display_tab_data(currency_data)
     
     # Show footer
     show_footer()
