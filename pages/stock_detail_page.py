@@ -31,6 +31,9 @@ st.markdown("""
         padding: 15px;
         margin: 10px 0;
     }
+    .dataframe th, .dataframe td {
+        text-align: right;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -88,6 +91,17 @@ NIFTY_50 = {
     'HDFCLIFE': 'HDFCLIFE.NS'
 }
 
+def format_number(value, decimal_places=2):
+    """Format numbers with specified decimal places"""
+    try:
+        if pd.isna(value):
+            return "N/A"
+        if isinstance(value, (int, float)):
+            return f"{value:,.{decimal_places}f}"
+        return str(value)
+    except:
+        return str(value)
+
 def get_stock_details(symbol):
     """Get comprehensive stock details from Yahoo Finance"""
     try:
@@ -127,8 +141,8 @@ def get_market_news():
         
         news_list = []
         for item in news_items:
-            title = item.find('h2').text.strip()
-            link = item.find('a')['href']
+            title = item.find('h2').text.strip() if item.find('h2') else "No title"
+            link = item.find('a')['href'] if item.find('a') else "#"
             news_list.append({'title': title, 'link': link})
         
         return news_list
@@ -149,8 +163,8 @@ def display_stock_metrics(info):
         st.markdown(f"""
         <div class="metric-card">
             <h4>Price</h4>
-            <h3>₹{current_price if current_price else 'N/A'}</h3>
-            <p>Change: <span class="{change_class}">{change_pct:.2f}%</span></p>
+            <h3>₹{format_number(current_price)}</h3>
+            <p>Change: <span class="{change_class}">{format_number(change_pct)}%</span></p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -158,9 +172,9 @@ def display_stock_metrics(info):
         st.markdown(f"""
         <div class="metric-card">
             <h4>Valuation</h4>
-            <p>PE: {info.get('trailingPE', 'N/A')}</p>
-            <p>P/B: {info.get('priceToBook', 'N/A')}</p>
-            <p>P/S: {info.get('priceToSalesTrailing12Months', 'N/A')}</p>
+            <p>PE: {format_number(info.get('trailingPE'))}</p>
+            <p>P/B: {format_number(info.get('priceToBook'))}</p>
+            <p>P/S: {format_number(info.get('priceToSalesTrailing12Months'))}</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -169,9 +183,9 @@ def display_stock_metrics(info):
         st.markdown(f"""
         <div class="metric-card">
             <h4>Financials</h4>
-            <p>Market Cap: ₹{market_cap/1e7:.2f} Cr</p>
-            <p>ROE: {info.get('returnOnEquity', 'N/A')}</p>
-            <p>ROA: {info.get('returnOnAssets', 'N/A')}</p>
+            <p>Market Cap: ₹{format_number(market_cap/1e7)} Cr</p>
+            <p>ROE: {format_number(info.get('returnOnEquity'))}%</p>
+            <p>ROA: {format_number(info.get('returnOnAssets'))}%</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -179,11 +193,15 @@ def display_stock_metrics(info):
         st.markdown(f"""
         <div class="metric-card">
             <h4>Dividend</h4>
-            <p>Yield: {info.get('dividendYield', 'N/A')}</p>
-            <p>Rate: {info.get('dividendRate', 'N/A')}</p>
-            <p>Payout: {info.get('payoutRatio', 'N/A')}</p>
+            <p>Yield: {format_number(info.get('dividendYield'))}%</p>
+            <p>Rate: ₹{format_number(info.get('dividendRate'))}</p>
+            <p>Payout: {format_number(info.get('payoutRatio'))}%</p>
         </div>
         """, unsafe_allow_html=True)
+
+def format_financial_data(df):
+    """Format financial data with 2 decimal places"""
+    return df.style.format("{:,.2f}")
 
 def display_financials(financials, balance_sheet, cashflow):
     """Display financial statements"""
@@ -193,19 +211,19 @@ def display_financials(financials, balance_sheet, cashflow):
     
     with tab1:
         if not financials.empty:
-            st.dataframe(financials)
+            st.dataframe(format_financial_data(financials))
         else:
             st.warning("No income statement data available")
     
     with tab2:
         if not balance_sheet.empty:
-            st.dataframe(balance_sheet)
+            st.dataframe(format_financial_data(balance_sheet))
         else:
             st.warning("No balance sheet data available")
     
     with tab3:
         if not cashflow.empty:
-            st.dataframe(cashflow)
+            st.dataframe(format_financial_data(cashflow))
         else:
             st.warning("No cash flow data available")
 
@@ -233,13 +251,31 @@ def display_news(news):
     """Display company news"""
     st.subheader("Latest News")
     
-    for item in news[:5]:
+    if not news:
+        st.warning("No news available")
+        return
+    
+    for item in news[:5]:  # Show only 5 latest news items
+        title = item.get('title', 'No title available')
+        link = item.get('link', '#')
+        publisher = item.get('publisher', 'Unknown source')
+        
+        # Handle timestamp conversion
+        publish_time = item.get('providerPublishTime')
+        if publish_time:
+            try:
+                publish_time = datetime.fromtimestamp(publish_time).strftime('%Y-%m-%d %H:%M')
+            except:
+                publish_time = 'N/A'
+        else:
+            publish_time = 'N/A'
+        
         st.markdown(f"""
         <div class="news-card">
-            <h4>{item.get('title', 'No title')}</h4>
-            <p>Published: {datetime.fromtimestamp(item.get('providerPublishTime', 0)).strftime('%Y-%m-%d %H:%M') if item.get('providerPublishTime') else 'N/A'}</p>
-            <p>Source: {item.get('publisher', 'N/A')}</p>
-            <a href="{item.get('link', '#')}" target="_blank">Read more</a>
+            <h4>{title}</h4>
+            <p>Published: {publish_time}</p>
+            <p>Source: {publisher}</p>
+            <a href="{link}" target="_blank">Read more</a>
         </div>
         """, unsafe_allow_html=True)
 
