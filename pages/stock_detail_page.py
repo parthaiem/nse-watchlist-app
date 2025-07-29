@@ -34,6 +34,23 @@ st.markdown("""
     .dataframe th, .dataframe td {
         text-align: right;
     }
+    .section-title {
+        margin-top: 20px;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+    }
+    .pros-cons {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    .pros {
+        background-color: #e6f7e6;
+    }
+    .cons {
+        background-color: #ffebee;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -91,12 +108,16 @@ NIFTY_50 = {
     'HDFCLIFE': 'HDFCLIFE.NS'
 }
 
-def format_number(value, decimal_places=2):
+def format_number(value, decimal_places=2, is_percent=False, is_currency=False):
     """Format numbers with specified decimal places"""
     try:
         if pd.isna(value):
             return "N/A"
         if isinstance(value, (int, float)):
+            if is_percent:
+                return f"{value:.{decimal_places}f}%"
+            if is_currency:
+                return f"₹ {value:,.{decimal_places}f}"
             return f"{value:,.{decimal_places}f}"
         return str(value)
     except:
@@ -131,153 +152,93 @@ def get_stock_details(symbol):
         st.error(f"Error fetching data: {str(e)}")
         return None
 
-def get_market_news():
-    """Fetch market news from Moneycontrol"""
-    try:
-        url = "https://www.moneycontrol.com/news/business/stocks/"
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        news_items = soup.find_all('li', {'class': 'clearfix'})[:5]
-        
-        news_list = []
-        for item in news_items:
-            title = item.find('h2').text.strip() if item.find('h2') else "No title"
-            link = item.find('a')['href'] if item.find('a') else "#"
-            news_list.append({'title': title, 'link': link})
-        
-        return news_list
-    except Exception as e:
-        st.warning(f"Could not fetch news: {str(e)}")
-        return []
-
-def display_stock_metrics(info):
-    """Display key stock metrics in cards"""
-    col1, col2, col3, col4 = st.columns(4)
+def display_key_metrics(info):
+    """Display key metrics in a structured format"""
+    st.markdown("### Key Metrics")
+    
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        current_price = info.get('currentPrice', 0)
-        previous_close = info.get('previousClose', 1)
-        change_pct = ((current_price - previous_close) / previous_close * 100) if previous_close != 0 else 0
-        change_class = "positive" if change_pct >= 0 else "negative"
-        
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4>Price</h4>
-            <h3>₹{format_number(current_price)}</h3>
-            <p>Change: <span class="{change_class}">{format_number(change_pct)}%</span></p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"**Market Cap:** {format_number(info.get('marketCap', 0)/1e7, is_currency=True)} Cr.")
+        st.markdown(f"**Current Price:** {format_number(info.get('currentPrice', 0), is_currency=True)}")
+        st.markdown(f"**High / Low:** {format_number(info.get('dayHigh', 0), is_currency=True)} / {format_number(info.get('dayLow', 0), is_currency=True)}")
+        st.markdown(f"**Stock P/E:** {format_number(info.get('trailingPE', 0))}")
+        st.markdown(f"**Book Value:** {format_number(info.get('bookValue', 0), is_currency=True)}")
+        st.markdown(f"**Dividend Yield:** {format_number(info.get('dividendYield', 0), is_percent=True)}")
     
     with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4>Valuation</h4>
-            <p>PE: {format_number(info.get('trailingPE'))}</p>
-            <p>P/B: {format_number(info.get('priceToBook'))}</p>
-            <p>P/S: {format_number(info.get('priceToSalesTrailing12Months'))}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"**ROCE:** {format_number(info.get('returnOnCapitalEmployed', 0), is_percent=True)}")
+        st.markdown(f"**ROE:** {format_number(info.get('returnOnEquity', 0), is_percent=True)}")
+        st.markdown(f"**Face Value:** {format_number(info.get('faceValue', 0), is_currency=True)}")
+        st.markdown(f"**Profit Var 5Yrs:** {format_number(44.2, is_percent=True)}")  # Example value
+        st.markdown(f"**Return over 5years:** {format_number(37.0, is_percent=True)}")  # Example value
+        st.markdown(f"**Industry PE:** {format_number(15.4)}")  # Example value
     
     with col3:
-        market_cap = info.get('marketCap', 0)
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4>Financials</h4>
-            <p>Market Cap: ₹{format_number(market_cap/1e7)} Cr</p>
-            <p>ROE: {format_number(info.get('returnOnEquity'))}%</p>
-            <p>ROA: {format_number(info.get('returnOnAssets'))}%</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4>Dividend</h4>
-            <p>Yield: {format_number(info.get('dividendYield'))}%</p>
-            <p>Rate: ₹{format_number(info.get('dividendRate'))}</p>
-            <p>Payout: {format_number(info.get('payoutRatio'))}%</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"**Price to Earning:** {format_number(info.get('trailingPE', 0))}")
+        st.markdown(f"**Return over 3months:** {format_number(17.9, is_percent=True)}")  # Example value
+        st.markdown(f"**Return over 6months:** {format_number(-11.2, is_percent=True)}")  # Example value
+        st.markdown(f"**Return on equity:** {format_number(info.get('returnOnEquity', 0), is_percent=True)}")
+        st.markdown(f"**Qtr Sales Var:** {format_number(-5.61, is_percent=True)}")  # Example value
+        st.markdown(f"**Qtr Profit Var:** {format_number(-5.99, is_percent=True)}")  # Example value
 
-def format_financial_data(df):
-    """Format financial data with 2 decimal places"""
-    return df.style.format("{:,.2f}")
-
-def display_financials(financials, balance_sheet, cashflow):
-    """Display financial statements"""
-    st.subheader("Financial Statements")
+def display_company_info():
+    """Display company information section"""
+    st.markdown("### About")
+    st.markdown("""
+    Incorporated in 1995, Aditya Birla Money Ltd is a stock broker, capital market products distributor, 
+    depository participant and PMS provider.
+    """)
     
-    tab1, tab2, tab3 = st.tabs(["Income Statement", "Balance Sheet", "Cash Flow"])
-    
-    with tab1:
-        if not financials.empty:
-            st.dataframe(format_financial_data(financials))
-        else:
-            st.warning("No income statement data available")
-    
-    with tab2:
-        if not balance_sheet.empty:
-            st.dataframe(format_financial_data(balance_sheet))
-        else:
-            st.warning("No balance sheet data available")
-    
-    with tab3:
-        if not cashflow.empty:
-            st.dataframe(format_financial_data(cashflow))
-        else:
-            st.warning("No cash flow data available")
-
-def display_holders(major_holders, institutional_holders):
-    """Display shareholder information"""
-    st.subheader("Shareholding Pattern")
+    st.markdown("### Key Points")
+    st.markdown("**Business Overview:**")
+    st.markdown("""
+    - ABML is a part of Aditya Birla Capital Limited which in turn is a part of Grasim Industries
+    - It is registered as a Stock Broker with SEBI and is a member of BSE and NSE in equities and derivatives
+    """)
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("**Major Holders**")
-        if not major_holders.empty:
-            st.dataframe(major_holders)
-        else:
-            st.warning("No major holders data available")
-    
-    with col2:
-        st.markdown("**Institutional Holders**")
-        if not institutional_holders.empty:
-            st.dataframe(institutional_holders)
-        else:
-            st.warning("No institutional holders data available")
-
-def display_news(news):
-    """Display company news"""
-    st.subheader("Latest News")
-    
-    if not news:
-        st.warning("No news available")
-        return
-    
-    for item in news[:5]:  # Show only 5 latest news items
-        title = item.get('title', 'No title available')
-        link = item.get('link', '#')
-        publisher = item.get('publisher', 'Unknown source')
-        
-        # Handle timestamp conversion
-        publish_time = item.get('providerPublishTime')
-        if publish_time:
-            try:
-                publish_time = datetime.fromtimestamp(publish_time).strftime('%Y-%m-%d %H:%M')
-            except:
-                publish_time = 'N/A'
-        else:
-            publish_time = 'N/A'
-        
-        st.markdown(f"""
-        <div class="news-card">
-            <h4>{title}</h4>
-            <p>Published: {publish_time}</p>
-            <p>Source: {publisher}</p>
-            <a href="{link}" target="_blank">Read more</a>
+        st.markdown("### Pros")
+        st.markdown("""
+        <div class="pros-cons pros">
+            <p>✓ Company has delivered good profit growth of 44.2% CAGR over last 5 years</p>
+            <p>✓ Company has a good return on equity (ROE) track record: 3 Years ROE 37.7%</p>
+            <p>✓ Debtor days have improved from 35.0 to 24.0 days</p>
         </div>
         """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("### Cons")
+        st.markdown("""
+        <div class="pros-cons cons">
+            <p>✗ Stock is trading at 4.05 times its book value</p>
+            <p>✗ Though the company is reporting repeated profits, it is not paying out dividend</p>
+            <p>✗ Company has low interest coverage ratio</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+def display_financial_performance():
+    """Display financial performance metrics"""
+    st.markdown("### Financial Performance")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("**Profit after tax:** ₹ 73.2 Cr.")
+        st.markdown("**PAT Qtr:** ₹ 15.4 Cr.")
+        st.markdown("**Sales growth 3Years:** 24.8%")
+    
+    with col2:
+        st.markdown("**Sales growth 5Years:** 21.6%")
+        st.markdown("**Profit Var 3Yrs:** 41.6%")
+        st.markdown("**ROE 5Yr:** 38.5%")
+    
+    with col3:
+        st.markdown("**ROE 3Yr:** 37.7%")
+        st.markdown("**Return over 1year:** 2.28%")
+        st.markdown("**Return over 3years:** [Value]")
 
 def main():
     st.title("📊 Comprehensive Stock Analysis Dashboard")
@@ -309,34 +270,105 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Display key metrics
-        display_stock_metrics(info)
-        
-        # Tabs for different sections
-        tab1, tab2, tab3, tab4 = st.tabs(["Financials", "Holdings", "News", "Charts"])
+        # Main tabs
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "Overview", "Chart", "Analysis", "Financials", "Holders", "News"
+        ])
         
         with tab1:
-            display_financials(stock_data['financials'], stock_data['balance_sheet'], stock_data['cashflow'])
+            display_key_metrics(info)
+            display_company_info()
+            display_financial_performance()
         
         with tab2:
-            display_holders(stock_data['major_holders'], stock_data['institutional_holders'])
-        
-        with tab3:
-            display_news(stock_data['news'])
-        
-        with tab4:
             st.subheader("Price Chart (1 Year)")
             if not stock_data['hist'].empty:
                 st.line_chart(stock_data['hist']['Close'])
             else:
                 st.warning("No historical data available")
-    
-    # Market news section
-    st.markdown("---")
-    st.subheader("📰 Latest Market News")
-    market_news = get_market_news()
-    for news in market_news:
-        st.markdown(f"- [{news['title']}]({news['link']})")
+        
+        with tab3:
+            st.subheader("Technical Analysis")
+            st.write("Technical analysis charts and indicators would go here")
+        
+        with tab4:
+            st.subheader("Financial Statements")
+            display_financial_performance()
+            
+            subtab1, subtab2, subtab3 = st.tabs(["Profit & Loss", "Balance Sheet", "Cash Flow"])
+            
+            with subtab1:
+                if not stock_data['financials'].empty:
+                    st.dataframe(stock_data['financials'].style.format("{:,.2f}"))
+                else:
+                    st.warning("No P&L data available")
+            
+            with subtab2:
+                if not stock_data['balance_sheet'].empty:
+                    st.dataframe(stock_data['balance_sheet'].style.format("{:,.2f}"))
+                else:
+                    st.warning("No balance sheet data available")
+            
+            with subtab3:
+                if not stock_data['cashflow'].empty:
+                    st.dataframe(stock_data['cashflow'].style.format("{:,.2f}"))
+                else:
+                    st.warning("No cash flow data available")
+            
+            st.subheader("Ratios")
+            st.write("Financial ratios analysis would go here")
+        
+        with tab5:
+            st.subheader("Shareholding Pattern")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Major Holders**")
+                if not stock_data['major_holders'].empty:
+                    st.dataframe(stock_data['major_holders'])
+                else:
+                    st.warning("No major holders data available")
+            
+            with col2:
+                st.markdown("**Institutional Holders**")
+                if not stock_data['institutional_holders'].empty:
+                    st.dataframe(stock_data['institutional_holders'])
+                else:
+                    st.warning("No institutional holders data available")
+            
+            st.subheader("Investors")
+            st.write("Investor information would go here")
+        
+        with tab6:
+            st.subheader("Latest News")
+            if stock_data['news']:
+                for item in stock_data['news'][:5]:
+                    title = item.get('title', 'No title available')
+                    link = item.get('link', '#')
+                    publisher = item.get('publisher', 'Unknown source')
+                    
+                    publish_time = item.get('providerPublishTime')
+                    if publish_time:
+                        try:
+                            publish_time = datetime.fromtimestamp(publish_time).strftime('%Y-%m-%d %H:%M')
+                        except:
+                            publish_time = 'N/A'
+                    else:
+                        publish_time = 'N/A'
+                    
+                    st.markdown(f"""
+                    <div class="news-card">
+                        <h4>{title}</h4>
+                        <p>Published: {publish_time}</p>
+                        <p>Source: {publisher}</p>
+                        <a href="{link}" target="_blank">Read more</a>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.warning("No news available")
+            
+            st.subheader("Documents")
+            st.write("Company documents would be listed here")
 
 if __name__ == "__main__":
     main()
