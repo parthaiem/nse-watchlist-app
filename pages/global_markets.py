@@ -58,11 +58,14 @@ def color_percent(val):
         return f'color: {color}; font-weight: bold;'
     return ''
 
-# Function to style prices
-def color_price(val):
-    return 'font-weight: bold;'
+# Function to style day range with two colors
+def color_day_range(val):
+    if isinstance(val, str) and '-' in val:
+        low, high = val.split('-')
+        return f'color: red; font-weight: bold;', f'color: green; font-weight: bold;'
+    return '', ''
 
-# Function to format numbers
+# Function to format numbers with 2 decimal places
 def format_number(x):
     if isinstance(x, (int, float)):
         return f"{x:,.2f}"
@@ -143,9 +146,7 @@ def get_market_data():
                     # Handle potential missing columns
                     day_low = hist["Low"][-1] if "Low" in hist.columns else current
                     day_high = hist["High"][-1] if "High" in hist.columns else current
-                    day_range = f"{day_low:.2f}-{day_high:.2f}"
-                    
-                    volume = hist["Volume"][-1] if "Volume" in hist.columns and not pd.isna(hist["Volume"][-1]) else 0
+                    day_range = f"{day_low:.2f} - {day_high:.2f}"
                     
                     all_data.append({
                         "Category": category,
@@ -154,8 +155,7 @@ def get_market_data():
                         "Price": current,
                         "Change (%)": change,
                         "Day Range": day_range,
-                        "Volume": volume,
-                        "Last Updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        "Last Updated": datetime.now().strftime("%Y-%m-%d %H:%M")
                     })
             except Exception as e:
                 st.warning(f"Could not load {name}: {str(e)}")
@@ -168,16 +168,6 @@ def get_market_data():
     fetch_data("Currencies", currencies)
 
     return pd.DataFrame(all_data)
-
-# Function to create metric cards
-def create_metric_card(title, value, change):
-    delta_color = "normal" if change >= 0 else "inverse"
-    st.metric(
-        label=title,
-        value=value,
-        delta=f"{change:.2f}%" if not pd.isna(change) else "N/A",
-        delta_color=delta_color
-    )
 
 # Main page function
 def main():
@@ -212,11 +202,19 @@ def main():
             font-size: 1.5em;
             margin-right: 5px;
         }
+        .day-range-low {
+            color: red;
+            font-weight: bold;
+        }
+        .day-range-high {
+            color: green;
+            font-weight: bold;
+        }
     </style>
     """, unsafe_allow_html=True)
     
     # Current time
-    st.markdown(f"<div class='big-font'>Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>", 
+    st.markdown(f"<div class='big-font'>Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", 
                unsafe_allow_html=True)
     
     # Get market data
@@ -237,22 +235,25 @@ def main():
         global_data = market_data[market_data["Category"] == "Global Indices"].copy()
         
         # Format the data before display
-        display_data = global_data[["Name", "Price", "Change (%)", "Day Range", "Volume", "Last Updated"]].copy()
+        display_data = global_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
         display_data["Price"] = display_data["Price"].apply(format_number)
         display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        display_data["Volume"] = display_data["Volume"].apply(lambda x: f"{x:,.0f}" if x > 0 else "N/A")
+        
+        # Apply styling
+        styled_data = display_data.style.format({
+            "Price": "{:,.2f}",
+            "Change (%)": "{:+.2f}%"
+        }).applymap(color_percent, subset=["Change (%)"])
         
         st.dataframe(
-            display_data,
+            styled_data,
             use_container_width=True,
             hide_index=True,
             column_config={
                 "Name": "Index",
                 "Price": st.column_config.NumberColumn("Price"),
                 "Change (%)": "Change",
-                "Day Range": "Day Range",
-                "Volume": "Volume",
-                "Last Updated": st.column_config.DatetimeColumn("Updated")
+                "Day Range": "Day Range"
             }
         )
     
@@ -261,22 +262,25 @@ def main():
         commodities_data = market_data[market_data["Category"] == "Commodities"].copy()
         
         # Format the data before display
-        display_data = commodities_data[["Name", "Price", "Change (%)", "Day Range", "Volume", "Last Updated"]].copy()
+        display_data = commodities_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
         display_data["Price"] = display_data["Price"].apply(lambda x: f"${format_number(x)}")
         display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        display_data["Volume"] = display_data["Volume"].apply(lambda x: f"{x:,.0f}" if x > 0 else "N/A")
+        
+        # Apply styling
+        styled_data = display_data.style.format({
+            "Price": "${:,.2f}",
+            "Change (%)": "{:+.2f}%"
+        }).applymap(color_percent, subset=["Change (%)"])
         
         st.dataframe(
-            display_data,
+            styled_data,
             use_container_width=True,
             hide_index=True,
             column_config={
                 "Name": "Commodity",
                 "Price": "Price",
                 "Change (%)": "Change",
-                "Day Range": "Day Range",
-                "Volume": "Volume",
-                "Last Updated": st.column_config.DatetimeColumn("Updated")
+                "Day Range": "Day Range"
             }
         )
     
@@ -285,22 +289,25 @@ def main():
         sectors_data = market_data[market_data["Category"] == "Indian Sectors"].copy()
         
         # Format the data before display
-        display_data = sectors_data[["Name", "Price", "Change (%)", "Day Range", "Volume", "Last Updated"]].copy()
+        display_data = sectors_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
         display_data["Price"] = display_data["Price"].apply(lambda x: f"₹{format_number(x)}")
         display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        display_data["Volume"] = display_data["Volume"].apply(lambda x: f"{x:,.0f}" if x > 0 else "N/A")
+        
+        # Apply styling
+        styled_data = display_data.style.format({
+            "Price": "₹{:,.2f}",
+            "Change (%)": "{:+.2f}%"
+        }).applymap(color_percent, subset=["Change (%)"])
         
         st.dataframe(
-            display_data,
+            styled_data,
             use_container_width=True,
             hide_index=True,
             column_config={
                 "Name": "Sector",
                 "Price": "Price",
                 "Change (%)": "Change",
-                "Day Range": "Day Range",
-                "Volume": "Volume",
-                "Last Updated": st.column_config.DatetimeColumn("Updated")
+                "Day Range": "Day Range"
             }
         )
     
@@ -309,22 +316,25 @@ def main():
         crypto_data = market_data[market_data["Category"] == "Cryptocurrencies"].copy()
         
         # Format the data before display
-        display_data = crypto_data[["Name", "Price", "Change (%)", "Day Range", "Volume", "Last Updated"]].copy()
+        display_data = crypto_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
         display_data["Price"] = display_data["Price"].apply(lambda x: f"${format_number(x)}")
         display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        display_data["Volume"] = display_data["Volume"].apply(lambda x: f"{x:,.0f}" if x > 0 else "N/A")
+        
+        # Apply styling
+        styled_data = display_data.style.format({
+            "Price": "${:,.2f}",
+            "Change (%)": "{:+.2f}%"
+        }).applymap(color_percent, subset=["Change (%)"])
         
         st.dataframe(
-            display_data,
+            styled_data,
             use_container_width=True,
             hide_index=True,
             column_config={
                 "Name": "Crypto",
                 "Price": "Price",
                 "Change (%)": "Change",
-                "Day Range": "Day Range",
-                "Volume": "Volume",
-                "Last Updated": st.column_config.DatetimeColumn("Updated")
+                "Day Range": "Day Range"
             }
         )
     
@@ -333,22 +343,25 @@ def main():
         currency_data = market_data[market_data["Category"] == "Currencies"].copy()
         
         # Format the data before display
-        display_data = currency_data[["Name", "Price", "Change (%)", "Day Range", "Volume", "Last Updated"]].copy()
+        display_data = currency_data[["Name", "Price", "Change (%)", "Day Range"]].copy()
         display_data["Price"] = display_data["Price"].apply(lambda x: f"{float(x):.4f}")
         display_data["Change (%)"] = display_data["Change (%)"].apply(lambda x: f"{x:+.2f}%")
-        display_data["Volume"] = display_data["Volume"].apply(lambda x: f"{x:,.0f}" if x > 0 else "N/A")
+        
+        # Apply styling
+        styled_data = display_data.style.format({
+            "Price": "{:.4f}",
+            "Change (%)": "{:+.2f}%"
+        }).applymap(color_percent, subset=["Change (%)"])
         
         st.dataframe(
-            display_data,
+            styled_data,
             use_container_width=True,
             hide_index=True,
             column_config={
                 "Name": "Currency Pair",
                 "Price": "Price",
                 "Change (%)": "Change",
-                "Day Range": "Day Range",
-                "Volume": "Volume",
-                "Last Updated": st.column_config.DatetimeColumn("Updated")
+                "Day Range": "Day Range"
             }
         )
     
