@@ -53,13 +53,15 @@ def show_footer():
 
 # Function to format numbers with 2 decimal places
 def format_number(x, is_currency=False, is_percent=False):
-    if isinstance(x, (int, float)):
+    try:
+        x = float(x)
         if is_percent:
             return f"{x:+.2f}%"
         if is_currency:
             return f"${x:,.2f}" if x >= 100 else f"${x:,.4f}"
         return f"{x:,.2f}"
-    return str(x)
+    except (ValueError, TypeError):
+        return str(x)
 
 # Function to get market data
 def get_market_data():
@@ -181,11 +183,9 @@ def main():
         }
         .day-range-low {
             color: red;
-            font-weight: bold;
         }
         .day-range-high {
             color: green;
-            font-weight: bold;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -208,19 +208,33 @@ def main():
     ])
     
     def display_tab_data(df, currency_symbol=""):
+        # Create a copy of the DataFrame for display
         display_df = df.copy()
+        
+        # Format the Price column
         display_df["Price"] = display_df["Price"].apply(lambda x: f"{currency_symbol}{format_number(x)}")
-        display_df["Change (%)"] = display_df["Change (%)"].apply(
-            lambda x: f"<span class='{'positive' if x >= 0 else 'negative'}'>{format_number(x, is_percent=True)}</span>",
-            na_action='ignore'
-        )
         
-        # Split Day Range into two colored parts
-        display_df["Day Range"] = display_df["Day Range"].apply(
-            lambda x: f"<span class='day-range-low'>{x.split(' - ')[0]}</span> - <span class='day-range-high'>{x.split(' - ')[1]}</span>"
-            if isinstance(x, str) and ' - ' in x else x
-        )
+        # Format the Change (%) column with color
+        def format_change(x):
+            try:
+                x = float(x)
+                color = "positive" if x >= 0 else "negative"
+                return f"<span class='{color}'>{format_number(x, is_percent=True)}</span>"
+            except:
+                return str(x)
         
+        display_df["Change (%)"] = display_df["Change (%)"].apply(format_change)
+        
+        # Format the Day Range column with two colors
+        def format_day_range(x):
+            if isinstance(x, str) and ' - ' in x:
+                low, high = x.split(' - ')
+                return f"<span class='day-range-low'>{low}</span> - <span class='day-range-high'>{high}</span>"
+            return x
+        
+        display_df["Day Range"] = display_df["Day Range"].apply(format_day_range)
+        
+        # Display the HTML table
         st.markdown(
             display_df[["Name", "Price", "Change (%)", "Day Range"]].to_html(escape=False, index=False),
             unsafe_allow_html=True
